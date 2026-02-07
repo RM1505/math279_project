@@ -63,7 +63,3 @@ def index_7z_folder(folder: str | Path) -> pd.DataFrame:
     df.reset_index(drop=True, inplace=True)
 
     return df
-
-if __name__ == "__main__":
-    df = index_7z_folder("data")
-    print(df) 
