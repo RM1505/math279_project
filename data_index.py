@@ -59,6 +59,8 @@ def index_7z_folder(folder: str | Path) -> pd.DataFrame:
 
     if "ticker" in df.columns:
         df = df.sort_values(["ticker", "start", "end"], ascending=[True, True, True])
+    
+    df.reset_index(drop=True, inplace=True)
 
     return df
 
