@@ -5,14 +5,16 @@ from pathlib import Path
 import tempfile
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
+from pandas.errors import EmptyDataError
 
 from tib import compute_tib
+from ofi import compute_ofi
 
 _NAME_RE = re.compile(r"^(?P<ticker>[A-Z]+)_(?P<date>\d{4}-\d{2}-\d{2})_")
 
 
 DATA_RAW = Path("data/raw")
-DATA_OUT = Path("data/processed/tib")
+DATA_OUT = Path("data/processed/minutely")
 
 
 def process_csv_file(args):
@@ -32,10 +34,20 @@ def process_csv_file(args):
     if out_path.exists():
         return None
 
-    df = pd.read_csv(csv_file, usecols=["time", " bid_size_1", "ask_size_1"])
+    try:
+        df = pd.read_csv(csv_file, usecols=["time", " bid_size_1", "ask_size_1", "bid_1", "ask_1"])
+    except EmptyDataError:
+        return None
+    except Exception:
+        return None
+
+    if df.empty:
+        return None
+
     tib_df = compute_tib(df)
-    
-    tib_df.to_csv(out_path, index=False)
+    ofi_df = compute_ofi(df)
+    df_combined = tib_df.merge(ofi_df, on="time", how="inner")
+    df_combined.to_csv(out_path, index=False)
     return out_path
 
 
