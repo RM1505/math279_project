@@ -43,7 +43,10 @@ def index_7z_folder(folder: str | Path) -> pd.DataFrame:
                 )
             )
             continue
-
+        if "." in m.group("ticker"):
+            # Skip tickers with dots, which are often junk (e.g. "AAPL.US")
+            continue
+        
         rows.append(
             dict(
                 ticker=m.group("ticker"),
