@@ -2,3 +2,5 @@ data/
 .venv/
 *.egg-info/
 __pycache__/
+requirements.txt
+clsz/
