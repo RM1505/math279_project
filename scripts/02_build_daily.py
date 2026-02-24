@@ -5,7 +5,7 @@ from tqdm import tqdm
 from ofi import worker
 
 def main():
-    root = Path(r"data/processed/minutely")
+    root = Path("data/processed/minutely")
     ticker_dirs = [p for p in root.iterdir() if p.is_dir()]
 
     out_dir = root.parent / "daily"

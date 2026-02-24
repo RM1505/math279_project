@@ -13,7 +13,7 @@ from ofi import compute_ofi
 _NAME_RE = re.compile(r"^(?P<ticker>[A-Z]+)_(?P<date>\d{4}-\d{2}-\d{2})_")
 
 
-DATA_RAW = Path("data/raw")
+DATA_RAW = Path("data/raw/LOBSTER")
 DATA_OUT = Path("data/processed/minutely")
 
 

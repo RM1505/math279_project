@@ -11,20 +11,20 @@ end = pd.to_datetime(df["end"], format="%Y-%m-%d").max()
 dates = pd.date_range(start=start, end=end, freq="D")
 T = len(dates)
 
-base = Path("data/processed/daily")
+base = Path("data/processed/opcl_by_ticker")
 
-P = np.full((T, n), np.nan, dtype=np.float32)
+R = np.full((T, n), np.nan, dtype=np.float32)
 dates_idx = pd.DatetimeIndex(dates)
 
 for j, ticker in enumerate(tickers):
-    fp = base / f"{ticker}_ofi_daily.csv"
-    s = pd.read_csv(fp, usecols=["date", "ofi_z60"])
+    fp = base / f"{ticker}_opcl.csv"
+    s = pd.read_csv(fp, usecols=["date", "OPCL"])
 
     s["date"] = pd.to_datetime(s["date"])
-    s = s.set_index("date")["ofi_z60"]
+    s = s.set_index("date")["OPCL"]
 
     s = s.reindex(dates_idx)
 
-    P[:, j] = s.to_numpy(dtype=np.float32)
+    R[:, j] = s.to_numpy(dtype=np.float32)
 
-np.save("data/processed/P.npy", P) #To load: P = np.load("data/processed/P.npy")
+np.save("data/processed/R.npy", R) #To load: R = np.load("data/processed/R.npy")
