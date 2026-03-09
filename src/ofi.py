@@ -4,15 +4,15 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-def compute_ofi(df: pd.DataFrame) -> pd.DataFrame:
+def compute_ofi(df: pd.DataFrame, level = "1") -> pd.DataFrame:
     if df is None or len(df) == 0:
         return pd.DataFrame({"time": pd.Series(dtype=df["time"].dtype if df is not None and "time" in df else "datetime64[ns]"),
                              "ofi":  pd.Series(dtype=float)})
     
-    b  = df["bid_1"].to_numpy(dtype=float)
-    a  = df["ask_1"].to_numpy(dtype=float)
-    qb = df[" bid_size_1"].to_numpy(dtype=float)
-    qa = df["ask_size_1"].to_numpy(dtype=float)
+    b  = df[f"bid_{level}"].to_numpy(dtype=float)
+    a  = df[f"ask_{level}"].to_numpy(dtype=float)
+    qb = df[f" bid_size_{level}"].to_numpy(dtype=float)
+    qa = df[f"ask_size_{level}"].to_numpy(dtype=float)
 
     b1  = np.roll(b, 1).astype(float, copy=False)
     a1  = np.roll(a, 1).astype(float, copy=False)

@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 
-def compute_tib(df: pd.DataFrame) -> pd.DataFrame:
+def compute_tib(df: pd.DataFrame, level = "1") -> pd.DataFrame:
     
-    bid = df[" bid_size_1"].to_numpy(dtype=float) # For some reason the column name has a leading space in the raw data :sob:
-    ask = df["ask_size_1"].to_numpy(dtype=float)
+    bid = df[f" bid_size_{level}"].to_numpy(dtype=float) # For some reason the column name has a leading space in the raw data :sob:
+    ask = df[f"ask_size_{level}"].to_numpy(dtype=float)
     
     denom = bid + ask
 

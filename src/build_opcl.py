@@ -1,10 +1,7 @@
-from __future__ import annotations
-
-from pathlib import Path
-import zipfile
-import numpy as np
 import pandas as pd
-
+import numpy as np
+import zipfile
+from pathlib import Path
 
 def build_opcl_panel_and_save_per_ticker(
     universe_df: pd.DataFrame,
@@ -14,15 +11,13 @@ def build_opcl_panel_and_save_per_ticker(
     out_dir: str | Path = "data/processed/opcl_by_ticker",
     ticker_col: str = "ticker",
     opcl_col: str = "OPCL",
+    sic_col: str = "HSICMG",
     fill_value: float | None = None,  
     dtype=np.float32,                 
 ) -> pd.DataFrame:
     """
-    Reads daily YYYYMMDD.csv.gz files inside yearly ZIPs, extracts OPCL for tickers in universe,
-    builds a date x ticker matrix for all calendar days in [start_date, end_date], and saves
-    one CSV per ticker (date, OPCL).
-
-    Returns the full panel DataFrame (index=date, columns=ticker).
+    Reads daily CRSP files, extracts OPCL and HSICMG, and saves 
+    per-ticker CSVs containing both columns.
     """
 
     crsp_zip_dir = Path(crsp_zip_dir)
@@ -44,7 +39,9 @@ def build_opcl_panel_and_save_per_ticker(
     all_dates = pd.date_range(start=start, end=end, freq="D")
     T = len(all_dates)
 
-    data = np.full((T, n), np.nan, dtype=dtype)
+    # Initialize two matrices: one for Returns, one for SIC codes
+    data_opcl = np.full((T, n), np.nan, dtype=dtype)
+    data_sic = np.full((T, n), np.nan, dtype=dtype)
 
     date_to_row = {d.normalize(): i for i, d in enumerate(all_dates)}
 
@@ -60,13 +57,12 @@ def build_opcl_panel_and_save_per_ticker(
             for name in daily_files:
                 fname = Path(name).name
                 ymd = fname.split(".")[0]
+                
                 if len(ymd) != 8 or not ymd.isdigit():
                     continue
 
                 d = pd.to_datetime(ymd, format="%Y%m%d", errors="coerce")
-                if pd.isna(d):
-                    continue
-                if d < start or d > end:
+                if pd.isna(d) or d < start or d > end:
                     continue
 
                 row = date_to_row.get(d.normalize())
@@ -74,34 +70,45 @@ def build_opcl_panel_and_save_per_ticker(
                     continue
 
                 with z.open(name) as f:
+                    # Load both columns
                     df = pd.read_csv(
                         f,
                         compression="gzip",
-                        usecols=[ticker_col, opcl_col],
+                        usecols=[ticker_col, opcl_col, sic_col],
                     )
 
                 df[ticker_col] = df[ticker_col].astype(str)
-
                 df = df[df[ticker_col].isin(tick_set)]
+                
                 if df.empty:
                     continue
 
-                s = (
-                    pd.to_numeric(df[opcl_col], errors="coerce")
-                    .astype(dtype, copy=False)
-                )
-                by_ticker = pd.Series(s.to_numpy(), index=df[ticker_col].to_numpy())
-                aligned = by_ticker.reindex(tickers)
+                # Align OPCL
+                opcl_vals = pd.to_numeric(df[opcl_col], errors="coerce").astype(dtype)
+                s_opcl = pd.Series(opcl_vals.to_numpy(), index=df[ticker_col])
+                data_opcl[row, :] = s_opcl.reindex(tickers).to_numpy(dtype=dtype)
 
-                data[row, :] = aligned.to_numpy(dtype=dtype)
+                # Align HSICMG
+                sic_vals = pd.to_numeric(df[sic_col], errors="coerce").astype(dtype)
+                s_sic = pd.Series(sic_vals.to_numpy(), index=df[ticker_col])
+                data_sic[row, :] = s_sic.reindex(tickers).to_numpy(dtype=dtype)
 
-    panel = pd.DataFrame(data, index=all_dates, columns=tickers)
+    # Convert matrices to DataFrames
+    panel_opcl = pd.DataFrame(data_opcl, index=all_dates, columns=tickers)
+    panel_sic = pd.DataFrame(data_sic, index=all_dates, columns=tickers)
 
     if fill_value is not None:
-        panel = panel.fillna(fill_value)
+        panel_opcl = panel_opcl.fillna(fill_value)
+        # Note: Usually you don't fillna industry codes with 0.0, 
+        # but you can if you want them to match.
 
+    # Save 2-column CSV per ticker
     for t in tickers:
         out_path = out_dir / f"{t}_opcl.csv"
-        panel[[t]].rename(columns={t: opcl_col}).to_csv(out_path, index_label="date")
+        ticker_df = pd.DataFrame({
+            opcl_col: panel_opcl[t],
+            sic_col: panel_sic[t]
+        })
+        ticker_df.to_csv(out_path, index_label="date")
 
-    return panel
+    return panel_opcl
