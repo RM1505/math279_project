@@ -4,19 +4,25 @@ from pathlib import Path
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
+
+# =============================
+# config
+# =============================
 INPUT_PATH = Path("data/processed/feature_table_with_residuals.csv")
 OUT_DIR = Path("data/processed")
 
 LAMBDA_GRID = [1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0]
 Q = 0.10
 MIN_TICKER_OBS = 252
-TRAIN_FRAC = 0.9
+TRAIN_FRAC = 0.80
 MIN_SECTOR_ASSETS = 2
 MIN_NAMES_PER_SECTOR_NEUTRAL = 4
+LOWRANK_K_LIST = [1, 3, 5]
 
-DATE_START = None   # e.g. "2015-01-01", or None to use all data
-DATE_END   = None    # e.g. "2020-12-31",
 
+# =============================
+# helpers
+# =============================
 def get_minute_cols(df: pd.DataFrame) -> list[str]:
     return sorted(
         [c for c in df.columns if c.startswith("minute_")],
@@ -30,7 +36,6 @@ def zscore_with_train_stats(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
     mean = train_mat.mean(axis=0, skipna=True)
     std = train_mat.std(axis=0, skipna=True, ddof=0).replace(0, 1.0)
-
     train_z = (train_mat - mean) / std
     test_z = (test_mat - mean) / std
     return train_z, test_z, mean, std
@@ -59,29 +64,18 @@ def daily_sector_neutral_spread(
     q: float = 0.10,
     min_names_per_sector: int = 4,
 ) -> float:
-    """
-    For one date:
-      - rank within each sector
-      - long top q fraction, short bottom q fraction
-      - average sector spreads equally across sectors
-    """
-    tmp = pd.concat(
-        [scores.rename("score"), returns.rename("ret")],
-        axis=1
-    ).dropna()
-
+    tmp = pd.concat([scores.rename("score"), returns.rename("ret")], axis=1).dropna()
     if tmp.empty:
         return np.nan
 
     tmp = tmp.join(ticker_to_sector.rename("sector"), how="left")
     tmp = tmp.dropna(subset=["sector"])
-
     if tmp.empty:
         return np.nan
 
     sector_spreads = []
 
-    for sector, g in tmp.groupby("sector"):
+    for _, g in tmp.groupby("sector"):
         n = len(g)
         if n < min_names_per_sector:
             continue
@@ -95,7 +89,7 @@ def daily_sector_neutral_spread(
         long_ret = g.iloc[-k:]["ret"].mean()
         sector_spreads.append(long_ret - short_ret)
 
-    if len(sector_spreads) == 0:
+    if not sector_spreads:
         return np.nan
 
     return float(np.mean(sector_spreads))
@@ -156,15 +150,13 @@ def fit_sector_block_model(
         .to_dict()
     )
 
-    for sector, sector_tickers in sorted(sector_to_tickers.items()):
+    for _, sector_tickers in sorted(sector_to_tickers.items()):
         sector_tickers = [t for t in sector_tickers if t in X_train_df.columns]
-
         if len(sector_tickers) < min_sector_assets:
             continue
 
         Xg = X_train_df[sector_tickers].to_numpy(dtype=float)
         Yg = Y_train_df[sector_tickers].to_numpy(dtype=float)
-
         Wg = fit_ridge(Xg, Yg, lam)
         W_full.loc[sector_tickers, sector_tickers] = Wg
 
@@ -177,6 +169,53 @@ def build_sector_offdiag(W_sector: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(vals, index=W_sector.index, columns=W_sector.columns)
 
 
+def lowrank_approx(W: np.ndarray, k: int) -> np.ndarray:
+    if W.size == 0:
+        return W.copy()
+    U, s, Vt = np.linalg.svd(W, full_matrices=False)
+    k_eff = min(k, len(s))
+    return (U[:, :k_eff] * s[:k_eff]) @ Vt[:k_eff, :]
+
+
+def build_sector_lowrank_model(
+    X_train_z_df: pd.DataFrame,
+    Y_train_z_df: pd.DataFrame,
+    ticker_to_sector: pd.Series,
+    lam: float,
+    rank_k: int,
+    min_sector_assets: int = 2,
+    zero_diag: bool = False,
+) -> pd.DataFrame:
+    tickers = X_train_z_df.columns.tolist()
+    W_full = pd.DataFrame(0.0, index=tickers, columns=tickers, dtype=float)
+
+    sector_to_tickers = (
+        ticker_to_sector.reset_index()
+        .groupby("sector")["ticker"]
+        .apply(list)
+        .to_dict()
+    )
+
+    for _, sector_tickers in sorted(sector_to_tickers.items()):
+        sector_tickers = [t for t in sector_tickers if t in X_train_z_df.columns]
+        if len(sector_tickers) < min_sector_assets:
+            continue
+
+        Xg = X_train_z_df[sector_tickers].to_numpy(dtype=float)
+        Yg = Y_train_z_df[sector_tickers].to_numpy(dtype=float)
+
+        Wg = fit_ridge(Xg, Yg, lam)
+        Wg_lr = lowrank_approx(Wg, rank_k)
+
+        if zero_diag:
+            Wg_lr = Wg_lr.copy()
+            np.fill_diagonal(Wg_lr, 0.0)
+
+        W_full.loc[sector_tickers, sector_tickers] = Wg_lr
+
+    return W_full
+
+
 def evaluate_model(
     name: str,
     W,
@@ -187,7 +226,7 @@ def evaluate_model(
     ticker_to_sector: pd.Series,
     q: float,
     min_names_per_sector_neutral: int,
-) -> tuple[pd.DataFrame, pd.Series, pd.Series, pd.Series, dict]:
+):
     if isinstance(W, pd.DataFrame):
         W = W.loc[X_test_z_df.columns, X_test_z_df.columns]
         pred_test_z = X_test_z_df.to_numpy(dtype=float) @ W.to_numpy(dtype=float)
@@ -201,11 +240,7 @@ def evaluate_model(
         + y_mean.loc[pred_cols].to_numpy(dtype=float)
     )
 
-    pred_test_df = pd.DataFrame(
-        pred_test,
-        index=X_test_z_df.index,
-        columns=pred_cols,
-    )
+    pred_test_df = pd.DataFrame(pred_test, index=X_test_z_df.index, columns=pred_cols)
 
     ret_test_eval_df = Y_test_df[pred_cols].copy()
     sector_map_eval = ticker_to_sector.loc[pred_cols]
@@ -231,22 +266,16 @@ def evaluate_model(
         axis=1
     ).dropna()
 
-    daily_sharpe = sharpe_from_series(daily_spreads)
-    annual_sharpe = annualize_sharpe(daily_sharpe)
-
-    daily_sharpe_sector_neutral = sharpe_from_series(daily_spreads_sector_neutral)
-    annual_sharpe_sector_neutral = annualize_sharpe(daily_sharpe_sector_neutral)
-
     metrics = {
         "model": name,
         "mean_daily_spread": daily_spreads.mean(),
         "std_daily_spread": daily_spreads.std(ddof=1),
-        "daily_spread_sharpe": daily_sharpe,
-        "annualized_spread_sharpe": annual_sharpe,
+        "daily_spread_sharpe": sharpe_from_series(daily_spreads),
+        "annualized_spread_sharpe": annualize_sharpe(sharpe_from_series(daily_spreads)),
         "mean_daily_spread_sector_neutral": daily_spreads_sector_neutral.mean(),
         "std_daily_spread_sector_neutral": daily_spreads_sector_neutral.std(ddof=1),
-        "daily_spread_sharpe_sector_neutral": daily_sharpe_sector_neutral,
-        "annualized_spread_sharpe_sector_neutral": annual_sharpe_sector_neutral,
+        "daily_spread_sharpe_sector_neutral": sharpe_from_series(daily_spreads_sector_neutral),
+        "annualized_spread_sharpe_sector_neutral": annualize_sharpe(sharpe_from_series(daily_spreads_sector_neutral)),
         "mean_daily_ic": daily_ic.mean(),
         "std_daily_ic": daily_ic.std(ddof=1),
         "n_pred_assets": pred_test_df.shape[1],
@@ -274,7 +303,6 @@ def sector_sharpe_breakdown(
 
     for sector, tickers in sorted(sector_to_tickers.items()):
         tickers = [t for t in tickers if t in pred_test_df.columns and t in ret_test_df.columns]
-
         if len(tickers) < 2:
             continue
 
@@ -332,23 +360,29 @@ def fit_and_eval_single_model(
         W = fit_diagonal_model(X_train_z, Y_train_z, lam)
 
     elif model_name == "sector_block":
-        W = fit_sector_block_model(
-            X_train_z_df,
-            Y_train_z_df,
-            ticker_to_sector=ticker_to_sector,
-            lam=lam,
-            min_sector_assets=min_sector_assets,
-        )
+        W = fit_sector_block_model(X_train_z_df, Y_train_z_df, ticker_to_sector, lam, min_sector_assets)
 
     elif model_name == "sector_offdiag":
-        W_sector = fit_sector_block_model(
-            X_train_z_df,
-            Y_train_z_df,
-            ticker_to_sector=ticker_to_sector,
-            lam=lam,
-            min_sector_assets=min_sector_assets,
-        )
+        W_sector = fit_sector_block_model(X_train_z_df, Y_train_z_df, ticker_to_sector, lam, min_sector_assets)
         W = build_sector_offdiag(W_sector)
+
+    elif model_name.startswith("sector_lowrank_k"):
+        rank_k = int(model_name.split("k")[-1])
+        W = build_sector_lowrank_model(
+            X_train_z_df, Y_train_z_df, ticker_to_sector,
+            lam=lam, rank_k=rank_k,
+            min_sector_assets=min_sector_assets,
+            zero_diag=False
+        )
+
+    elif model_name.startswith("sector_lowrank_offdiag_k"):
+        rank_k = int(model_name.split("k")[-1])
+        W = build_sector_lowrank_model(
+            X_train_z_df, Y_train_z_df, ticker_to_sector,
+            lam=lam, rank_k=rank_k,
+            min_sector_assets=min_sector_assets,
+            zero_diag=True
+        )
 
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
@@ -426,10 +460,9 @@ def lambda_sweep_for_model(
         }
 
         print(
-            f"{model_name:>15} | lambda={lam:>6} | "
+            f"{model_name:>24} | lambda={lam:>6} | "
             f"ann_sharpe={metrics['annualized_spread_sharpe']:.6f} | "
-            f"ann_sharpe_sector_neutral={metrics['annualized_spread_sharpe_sector_neutral']:.6f} | "
-            f"mean_ic={metrics['mean_daily_ic']:.6f}"
+            f"ann_sharpe_sector_neutral={metrics['annualized_spread_sharpe_sector_neutral']:.6f}"
         )
 
     sweep_df = pd.DataFrame(sweep_rows).sort_values(
@@ -439,21 +472,15 @@ def lambda_sweep_for_model(
 
     best_lambda = sweep_df.iloc[0]["lambda"]
     best_result = results_by_lambda[best_lambda]
-
     return sweep_df, best_lambda, best_result
 
 
+# =============================
+# load data
+# =============================
 df = pd.read_csv(INPUT_PATH)
 df["date"] = pd.to_datetime(df["date"])
 df = df.sort_values(["date", "ticker"]).reset_index(drop=True)
-
-if DATE_START is not None:
-    df = df[df["date"] >= pd.Timestamp(DATE_START)].copy()
-if DATE_END is not None:
-    df = df[df["date"] <= pd.Timestamp(DATE_END)].copy()
-
-if df.empty:
-    raise ValueError(f"No data remains after date filtering ({DATE_START} to {DATE_END}).")
 
 minute_cols = get_minute_cols(df)
 df[minute_cols] = df[minute_cols].fillna(0.0)
@@ -471,19 +498,21 @@ ticker_to_sector = (
     .set_index("ticker")["sector"]
 )
 
-
+# =============================
+# date split
+# =============================
 all_dates = np.sort(df["date"].unique())
 split_idx = int(len(all_dates) * TRAIN_FRAC)
 
 train_dates = all_dates[:split_idx]
 test_dates = all_dates[split_idx:]
 
-if len(train_dates) < 2 or len(test_dates) < 2:
-    raise ValueError("Not enough dates for a train/test split.")
-
 df_train = df[df["date"].isin(train_dates)].copy()
 df_test = df[df["date"].isin(test_dates)].copy()
 
+# =============================
+# PCA signal
+# =============================
 X_train_minutes = df_train[minute_cols].to_numpy(dtype=float)
 X_test_minutes = df_test[minute_cols].to_numpy(dtype=float)
 
@@ -513,6 +542,9 @@ df_with_signal = (
     .reset_index(drop=True)
 )
 
+# =============================
+# pivot matrices
+# =============================
 signal_mat = (
     df_with_signal.pivot(index="date", columns="ticker", values="ofi_pca_signal")
     .sort_index()
@@ -538,25 +570,16 @@ signal_mat = signal_mat[keep_tickers]
 ret_mat = ret_mat[keep_tickers]
 ticker_to_sector = ticker_to_sector.loc[keep_tickers]
 
-if signal_mat.shape[1] == 0:
-    raise ValueError("No tickers remain after coverage filtering.")
-
-if signal_mat.shape[0] < 3:
-    raise ValueError("Not enough dates after alignment.")
-
-
+# =============================
+# split and lag
+# =============================
 train_dates_idx = signal_mat.index.intersection(pd.Index(train_dates))
 test_dates_idx = signal_mat.index.intersection(pd.Index(test_dates))
 
 signal_train = signal_mat.loc[train_dates_idx].copy()
 ret_train = ret_mat.loc[train_dates_idx].copy()
-
 signal_test = signal_mat.loc[test_dates_idx].copy()
 ret_test = ret_mat.loc[test_dates_idx].copy()
-
-if len(signal_train) < 2 or len(signal_test) < 2:
-    raise ValueError("Not enough train/test dates after pivot alignment.")
-
 
 X_train_df = signal_train.iloc[:-1].copy()
 Y_train_df = ret_train.iloc[1:].copy()
@@ -566,13 +589,9 @@ X_test_df = signal_test.iloc[:-1].copy()
 Y_test_df = ret_test.iloc[1:].copy()
 X_test_df.index = Y_test_df.index
 
-if X_train_df.shape != Y_train_df.shape:
-    raise ValueError(f"Train shape mismatch: {X_train_df.shape} vs {Y_train_df.shape}")
-
-if X_test_df.shape != Y_test_df.shape:
-    raise ValueError(f"Test shape mismatch: {X_test_df.shape} vs {Y_test_df.shape}")
-
-
+# =============================
+# z-score
+# =============================
 X_train_z_df, X_test_z_df, x_mean, x_std = zscore_with_train_stats(X_train_df, X_test_df)
 Y_train_z_df, Y_test_z_df, y_mean, y_std = zscore_with_train_stats(Y_train_df, Y_test_df)
 
@@ -607,19 +626,19 @@ ticker_to_sector = ticker_to_sector.loc[kept_cols]
 X_train_z = X_train_z_df.to_numpy(dtype=float)
 Y_train_z = Y_train_z_df.to_numpy(dtype=float)
 
-n_train_dates, n_assets = X_train_z.shape
-n_test_dates = X_test_z_df.shape[0]
-
-if n_assets == 0:
-    raise ValueError("No usable assets remain after filtering.")
-
-print(f"Using {n_train_dates} train dates, {n_test_dates} test dates, and {n_assets} assets.")
-print("Train dates:", pd.Timestamp(train_dates[0]).date(), "to", pd.Timestamp(train_dates[-1]).date())
-print("Test dates:", pd.Timestamp(test_dates[0]).date(), "to", pd.Timestamp(test_dates[-1]).date())
-print("PCA explained variance ratio:", float(pca.explained_variance_ratio_[0]))
+print(f"Assets: {X_train_z.shape[1]}, train dates: {X_train_z.shape[0]}, test dates: {X_test_z_df.shape[0]}")
 print("Lambda grid:", LAMBDA_GRID)
 
-model_names = ["dense", "sector_block", "diagonal_only", "sector_offdiag"]
+# =============================
+# model sweep
+# =============================
+model_names = [
+    "dense",
+    "sector_block",
+    "sector_offdiag",
+    "diagonal_only",
+] + [f"sector_lowrank_k{k}" for k in LOWRANK_K_LIST] \
+  + [f"sector_lowrank_offdiag_k{k}" for k in LOWRANK_K_LIST]
 
 all_sweeps = []
 best_summary_rows = []
@@ -627,7 +646,6 @@ best_results = {}
 
 for model_name in model_names:
     print(f"\n=== Sweeping {model_name} ===")
-
     sweep_df, best_lambda, best_result = lambda_sweep_for_model(
         model_name=model_name,
         lambda_grid=LAMBDA_GRID,
@@ -652,10 +670,7 @@ for model_name in model_names:
     best_metrics["best_lambda"] = best_lambda
     best_summary_rows.append(best_metrics)
 
-    best_results[model_name] = {
-        "best_lambda": best_lambda,
-        **best_result,
-    }
+    best_results[model_name] = {"best_lambda": best_lambda, **best_result}
 
 lambda_sweep_df = pd.concat(all_sweeps, axis=0, ignore_index=True)
 best_models_df = pd.DataFrame(best_summary_rows).sort_values(
@@ -666,27 +681,23 @@ best_models_df = pd.DataFrame(best_summary_rows).sort_values(
 print("\nBest model summary:")
 print(best_models_df.to_string(index=False))
 
-OUT_DIR = Path("data/processed/adjacency_matrix_analysis")
+# =============================
+# save
+# =============================
+"""
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-np.save(OUT_DIR / "ofi_market_pca_kernel_train_only.npy", ofi_kernel)
-df_with_signal.to_csv(OUT_DIR / "feature_table_with_market_pca_signal_train_test.csv", index=False)
-signal_mat.to_csv(OUT_DIR / "signal_matrix_unbalanced.csv")
-ret_mat.to_csv(OUT_DIR / "return_matrix_unbalanced.csv")
-
-lambda_sweep_df.to_csv(OUT_DIR / "lambda_sweep_results.csv", index=False)
-best_models_df.to_csv(OUT_DIR / "best_model_summary.csv", index=False)
-ticker_to_sector.rename("sector").to_csv(OUT_DIR / "ticker_sector_used.csv", header=True)
+lambda_sweep_df.to_csv(OUT_DIR / "lambda_sweep_results_with_lowrank.csv", index=False)
+best_models_df.to_csv(OUT_DIR / "best_model_summary_with_lowrank.csv", index=False)
 
 for model_name, result in best_results.items():
-    best_lambda = result["best_lambda"]
+    safe_model = model_name.replace(" ", "_")
+    W = result["W"]
     pred_test_df = result["pred_test_df"]
     daily_spreads = result["daily_spreads"]
     daily_spreads_sector_neutral = result["daily_spreads_sector_neutral"]
     daily_ic = result["daily_ic"]
     sector_breakdown_df = result["sector_breakdown_df"]
-    W = result["W"]
-
-    safe_model = model_name.replace(" ", "_")
 
     pred_test_df.to_csv(OUT_DIR / f"predicted_returns_{safe_model}_best_lambda.csv")
     daily_spreads.to_csv(OUT_DIR / f"daily_spreads_{safe_model}_best_lambda.csv", header=["spread"])
@@ -700,7 +711,9 @@ for model_name, result in best_results.items():
     if isinstance(W, pd.DataFrame):
         W.to_csv(OUT_DIR / f"adjacency_matrix_{safe_model}_best_lambda.csv")
     else:
-        W_df = pd.DataFrame(W, index=kept_cols, columns=kept_cols)
-        W_df.to_csv(OUT_DIR / f"adjacency_matrix_{safe_model}_best_lambda.csv")
+        pd.DataFrame(W, index=kept_cols, columns=kept_cols).to_csv(
+            OUT_DIR / f"adjacency_matrix_{safe_model}_best_lambda.csv"
+        )
 
 print("\nSaved outputs to:", OUT_DIR.resolve())
+"""
