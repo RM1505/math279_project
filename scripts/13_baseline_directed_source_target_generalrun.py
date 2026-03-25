@@ -10,7 +10,7 @@ import numpy as np
 
 
 # =========================================================
-# Default settings for the 25-run sweep
+# Configuration
 # =========================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -21,23 +21,43 @@ BASELINE_FILE = Path(__file__).resolve().with_name("12_baseline_directed_source_
 
 OUTDIR = PROJECT_ROOT / "results/13_directed_source_target_generalrun"
 
-# 5 x 5 = 25 runs
-Q_GRID = [0.05, 0.10, 0.15, 0.20, 0.25]
-MIN_COUNT_GRID = [40, 60, 80, 100, 150]
+# ── universe ──────────────────────────────────────────────
+# Subset to the N_TOP assets with the most complete data to reduce the
+# multiple-testing burden. With N=514 there are 263K edge tests; at N=150
+# that drops to ~22K, making BH 12x less conservative and direct-threshold
+# runs much cleaner.
+N_TOP = 150
 
-# Keep these fixed for now
+# ── walk-forward ──────────────────────────────────────────
 LAG = 1
 KS = 25
 KT = 25
 WEIGHT_MODE = "abs_tstat"
-TRAIN_LEN = 1260
-TEST_LEN = 63
-STEP = 21            # more dynamic than 63
-TC_BPS = 1.0
+TRAIN_LEN = 1260        # ~5 years of training
+TEST_LEN  = 21          # ~1 month test per block (was 63 — keeps model fresh with step=10)
+STEP      = 10          # refit every 10 trading days
+TC_BPS = 0
 PERIODS_PER_YEAR = 252
 DOLLAR_NEUTRAL = True
-REBALANCE_EVERY = 1
+REBALANCE_EVERY = 5
 DTYPE = np.float64
+
+# ── sweep parameters ──────────────────────────────────────
+# We sweep |t|-threshold × min_count with BH disabled (use_bh=False).
+#
+# Rationale: BH with 150*149 ≈ 22K tests still requires |t|≈4 for any edge
+# to survive at q=0.10. Sweeping tstat_min directly gives transparent
+# control over statistical stringency.  Expected false-positives under H0:
+#   FP ≈ 22350 × erfc(tstat_min / sqrt(2))
+#   tstat_min=3.0 → FP≈ 22350×0.0027 ≈  60
+#   tstat_min=3.5 → FP≈ 22350×0.0005 ≈  10
+#   tstat_min=4.0 → FP≈ 22350×6e-5  ≈   1
+#   tstat_min=4.5 → FP≈ 22350×7e-6  ≈  0.2
+#   tstat_min=5.0 → FP≈ 22350×6e-7  ≈  0.01
+USE_BH = False
+TSTAT_MIN_GRID = [3.0, 3.5, 4.0, 4.5, 5.0]   # binding statistical bar
+MIN_COUNT_GRID = [2, 5, 10, 20, 50]           # minimum joint observations per edge
+Q = 0.10   # only used if USE_BH = True
 
 
 # =========================================================
@@ -72,9 +92,19 @@ def nonzero_fraction(x: np.ndarray, eps: float = 1e-12) -> float:
     return float(np.mean(np.abs(vals) > eps))
 
 
-def run_name(q: float, min_count: int) -> str:
-    q_str = f"{q:.2f}".replace(".", "p")
-    return f"q_{q_str}_mincount_{min_count}"
+def run_name(tstat_min: float, min_count: int) -> str:
+    t_str = f"{tstat_min:.1f}".replace(".", "p")
+    return f"tmin_{t_str}_mincount_{min_count}"
+
+
+def select_top_assets(R: np.ndarray, P: np.ndarray, n_top: int) -> np.ndarray:
+    """
+    Return indices of the n_top assets with the most jointly finite (R, P) observations.
+    Uses the full dataset for selection — acceptable as a pre-filtering step.
+    """
+    joint_finite = np.isfinite(R) & np.isfinite(P)   # (T, N)
+    completeness = joint_finite.sum(axis=0)           # (N,)
+    return np.argsort(-completeness)[:n_top]
 
 
 # =========================================================
@@ -87,14 +117,21 @@ def main():
     OUTDIR.mkdir(parents=True, exist_ok=True)
 
     print("Loading data once...")
-    R = base.load_matrix(R_PATH)
-    P = base.load_matrix(P_PATH)
+    R_full = base.load_matrix(R_PATH)
+    P_full = base.load_matrix(P_PATH)
 
-    if R.shape != P.shape:
-        raise ValueError(f"R and P shape mismatch: R={R.shape}, P={P.shape}")
+    if R_full.shape != P_full.shape:
+        raise ValueError(f"R and P shape mismatch: R={R_full.shape}, P={P_full.shape}")
 
-    T, N = R.shape
-    print(f"R,P shape = {(T, N)}")
+    T, N_full = R_full.shape
+    print(f"Full R,P shape = {(T, N_full)}")
+
+    # Subset universe
+    top_idx = select_top_assets(R_full, P_full, N_TOP)
+    R = R_full[:, top_idx]
+    P = P_full[:, top_idx]
+    print(f"Subsetted to top {N_TOP} assets by data completeness → R,P shape = {R.shape}")
+    N = R.shape[1]
 
     windows = base.make_walkforward_windows(
         T,
@@ -108,19 +145,26 @@ def main():
     if not windows:
         raise ValueError("No walk-forward windows created.")
 
-    print(f"Created {len(windows)} windows")
-    print(f"Running {len(Q_GRID) * len(MIN_COUNT_GRID)} total configurations...")
+    print(f"Created {len(windows)} windows (step={STEP}, test_len={TEST_LEN})")
+    print(f"Running {len(TSTAT_MIN_GRID) * len(MIN_COUNT_GRID)} total configurations...")
+    n_tests = N * (N - 1)
+    print(f"Edge tests per window: {n_tests:,} (N={N})")
+    for tm in TSTAT_MIN_GRID:
+        import math
+        fp = n_tests * math.erfc(tm / math.sqrt(2.0))
+        print(f"  tstat_min={tm:.1f}: expected false positives under H0 ≈ {fp:.1f}")
+    print()
 
     summary_rows = []
     summary_json = []
 
-    total_runs = len(Q_GRID) * len(MIN_COUNT_GRID)
+    total_runs = len(TSTAT_MIN_GRID) * len(MIN_COUNT_GRID)
     run_idx = 0
 
-    for q in Q_GRID:
+    for tstat_min in TSTAT_MIN_GRID:
         for min_count in MIN_COUNT_GRID:
             run_idx += 1
-            name = run_name(q, min_count)
+            name = run_name(tstat_min, min_count)
             run_outdir = OUTDIR / name
             run_outdir.mkdir(parents=True, exist_ok=True)
 
@@ -133,13 +177,15 @@ def main():
                 lag=LAG,
                 ks=KS,
                 kt=KT,
-                q=q,
+                q=Q,
                 min_count=min_count,
                 weight_mode=WEIGHT_MODE,
                 tc_bps=TC_BPS,
                 periods_per_year=PERIODS_PER_YEAR,
                 dollar_neutral=DOLLAR_NEUTRAL,
                 rebalance_every=REBALANCE_EVERY,
+                use_bh=USE_BH,
+                tstat_min=tstat_min,
                 dtype=DTYPE,
             )
 
@@ -154,28 +200,32 @@ def main():
             (run_outdir / "window_reports.json").write_text(json.dumps(window_reports, indent=2))
 
             # Aggregate diagnostics
-            avg_kept_edges = float(np.mean([w["n_kept_edges"] for w in window_reports])) if window_reports else 0.0
-            avg_strategy_edges = float(np.mean([w["n_strategy_edges"] for w in window_reports])) if window_reports else 0.0
-            avg_direction_gap = float(np.mean([w["direction_gap"] for w in window_reports])) if window_reports else 0.0
-            avg_forward_mass = float(np.mean([w["forward_mass"] for w in window_reports])) if window_reports else 0.0
-            avg_reverse_mass = float(np.mean([w["reverse_mass"] for w in window_reports])) if window_reports else 0.0
+            avg_kept_edges   = float(np.mean([w["n_kept_edges"]   for w in window_reports])) if window_reports else 0.0
+            avg_strat_edges  = float(np.mean([w["n_strategy_edges"] for w in window_reports])) if window_reports else 0.0
+            avg_dir_gap      = float(np.mean([w["direction_gap"]  for w in window_reports])) if window_reports else 0.0
+            avg_fwd_mass     = float(np.mean([w["forward_mass"]   for w in window_reports])) if window_reports else 0.0
+            avg_rev_mass     = float(np.mean([w["reverse_mass"]   for w in window_reports])) if window_reports else 0.0
+            frac_nonzero_windows = float(np.mean([w["n_kept_edges"] > 0 for w in window_reports])) if window_reports else 0.0
 
             gross_nonzero_frac = nonzero_fraction(result.pnl_gross)
-            net_nonzero_frac = nonzero_fraction(result.pnl_net)
+            net_nonzero_frac   = nonzero_fraction(result.pnl_net)
 
             row = {
                 "run_name": name,
-                "q": q,
+                "tstat_min": tstat_min,
                 "min_count": min_count,
+                "use_bh": int(USE_BH),
                 "lag": LAG,
                 "ks": KS,
                 "kt": KT,
+                "q": Q,
                 "weight_mode": WEIGHT_MODE,
                 "train_len": TRAIN_LEN,
                 "test_len": TEST_LEN,
                 "step": STEP,
                 "tc_bps": TC_BPS,
                 "rebalance_every": REBALANCE_EVERY,
+                "n_assets": N,
                 "dollar_neutral": int(DOLLAR_NEUTRAL),
 
                 "active_obs": result.metrics["active_obs"],
@@ -200,10 +250,11 @@ def main():
                 "turnover_median": result.metrics["turnover"]["median"],
 
                 "avg_kept_edges": avg_kept_edges,
-                "avg_strategy_edges": avg_strategy_edges,
-                "avg_forward_mass": avg_forward_mass,
-                "avg_reverse_mass": avg_reverse_mass,
-                "avg_direction_gap": avg_direction_gap,
+                "avg_strategy_edges": avg_strat_edges,
+                "avg_forward_mass": avg_fwd_mass,
+                "avg_reverse_mass": avg_rev_mass,
+                "avg_direction_gap": avg_dir_gap,
+                "frac_nonzero_windows": frac_nonzero_windows,
             }
 
             summary_rows.append(row)
@@ -211,8 +262,8 @@ def main():
 
             print(
                 f"    net_sharpe={row['net_sharpe']:.4f}, "
-                f"gross_sharpe={row['gross_sharpe']:.4f}, "
                 f"avg_kept_edges={row['avg_kept_edges']:.1f}, "
+                f"frac_nonzero_windows={row['frac_nonzero_windows']:.2f}, "
                 f"gross_nonzero_fraction={row['gross_nonzero_fraction']:.4f}"
             )
 
@@ -236,6 +287,11 @@ def main():
 
     print(f"\nDone. Saved all results to: {OUTDIR}")
     print(f"Master summary: {csv_path}")
+    print("\nTop 5 by net Sharpe:")
+    for row in best_by_net[:5]:
+        print(f"  {row['run_name']}: net_sharpe={row['net_sharpe']:.4f}, "
+              f"avg_kept_edges={row['avg_kept_edges']:.1f}, "
+              f"frac_nonzero_windows={row['frac_nonzero_windows']:.2f}")
 
 
 if __name__ == "__main__":

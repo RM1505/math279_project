@@ -3,41 +3,19 @@
 18_dhillon_bipartite_source_target.py
 
 Dhillon-style bipartite spectral co-clustering for a directed source-target
-OFI -> next-day-return matrix, wrapped in a walk-forward backtest.
+OFI -> next-day residual-return matrix, with DAILY trading but slower
+reclustering / block reselection.
 
-Main idea
----------
-For each training window:
-1. Build pairwise directed edge statistics from lagged OFI signals and next-day returns.
-2. Screen edges by min_count + BH-FDR on two-sided t-tests.
-3. Convert the screened matrix into a NONNEGATIVE bipartite weight matrix
-   (default: abs(t-stat)), because Dhillon (2001) is a bipartite spectral graph method.
-4. Run spectral co-clustering on the row/column sides jointly.
-5. Score row-cluster/column-cluster blocks using the SIGNED training score matrix.
-6. Pick the best source-target block and trade a block-factor portfolio out of sample.
-
-Expected input
---------------
-Two wide matrices with the same daily index and the same asset columns:
-- signals: daily OFI-type signal matrix P, shape [T x N]
-- returns: daily next-day tradable return matrix R, shape [T x N]
-
-Missing values are allowed. Supported formats: .csv, .parquet, .pkl, .npy, .npz
-
-Example
--------
-python3 scripts/18_dhillon_bipartite_source_target.py \
-  --signals data/processed/P.npy \
-  --returns data/processed/R.npy \
-  --outdir results/18_dhillon_bipartite \
-  --train-days 252 \
-  --rebalance-days 5 \
-  --n-clusters 6 \
-  --fdr-q 0.10 \
-  --min-count 120 \
-  --cluster-weight-stat abs_t \
-  --block-score-stat sr \
-  --cost-bps 5
+Main design
+-----------
+- Trade every day using lagged daily signals.
+- Recompute edge stats, re-cluster, and reselect the best source-target block
+  only every RECLUSTER_DAYS.
+- Default to N_CLUSTERS = 2, which is much more stable and much closer to the
+  original Dhillon bipartition idea.
+- Keep the same data paths:
+    data/processed/signal_matrix_unbalanced.csv
+    data/processed/return_matrix_unbalanced.csv
 """
 
 from __future__ import annotations
@@ -45,10 +23,9 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -58,71 +35,102 @@ from sklearn.cluster import KMeans
 from sklearn.utils.extmath import randomized_svd
 
 
-# -----------------------------------------------------------------------------
-# IO helpers
-# -----------------------------------------------------------------------------
+# =============================================================================
+# Paths and default parameters
+# =============================================================================
 
-def _read_matrix(path: str) -> pd.DataFrame:
-    """Read a wide T x N matrix with date-like index and asset columns."""
-    p = Path(path)
-    suf = p.suffix.lower()
+SIGNALS_PATH = Path("data/processed/signal_matrix_unbalanced.csv")
+RETURNS_PATH = Path("data/processed/return_matrix_unbalanced.csv")
+OUT_DIR = Path("data/processed/dhillon_bipartite_daily")
+
+TRAIN_DAYS = 252
+RECLUSTER_DAYS = 20
+N_CLUSTERS = 2
+
+FDR_Q = 0.10
+MIN_COUNT = 120
+
+CLUSTER_WEIGHT_STAT = "abs_t"   # {"abs_t", "abs_sr", "positive_sr", "positive_mu"}
+BLOCK_SCORE_STAT = "sr"         # {"sr", "t", "mu"}
+
+COST_BPS = 5.0
+ALLOW_SAME_CLUSTER_PAIR = True
+RANDOM_STATE = 0
+
+
+# =============================================================================
+# IO
+# =============================================================================
+
+def read_matrix(path: Path) -> pd.DataFrame:
+    """Read a wide [dates x assets] matrix."""
+    suf = path.suffix.lower()
 
     if suf == ".csv":
-        df = pd.read_csv(p, index_col=0)
+        df = pd.read_csv(path, index_col=0)
     elif suf in {".parquet", ".pq"}:
-        df = pd.read_parquet(p)
+        df = pd.read_parquet(path)
     elif suf in {".pkl", ".pickle"}:
-        df = pd.read_pickle(p)
+        df = pd.read_pickle(path)
     elif suf == ".npy":
-        arr = np.load(p, allow_pickle=True)
-        if isinstance(arr, np.ndarray) and arr.dtype.names is None:
-            # For .npy files, create a DatetimeIndex starting from 2007-06-27 (daily)
-            T, N = arr.shape
-            date_index = pd.date_range(start="2007-06-27", periods=T, freq="D")
-            df = pd.DataFrame(arr, index=date_index)
-        else:
-            raise ValueError(".npy input must be a plain 2D array if used directly.")
+        arr = np.load(path, allow_pickle=True)
+        if not isinstance(arr, np.ndarray) or arr.ndim != 2:
+            raise ValueError(f"{path} must be a plain 2D array.")
+        df = pd.DataFrame(arr)
     elif suf == ".npz":
-        z = np.load(p, allow_pickle=True)
-        if "data" in z:
-            data = z["data"]
-            index = z["index"] if "index" in z else np.arange(data.shape[0])
-            columns = z["columns"] if "columns" in z else np.arange(data.shape[1])
-            df = pd.DataFrame(data, index=index, columns=columns)
-        else:
-            raise ValueError(".npz input must contain key 'data' and optionally 'index','columns'.")
+        z = np.load(path, allow_pickle=True)
+        if "data" not in z:
+            raise ValueError(f"{path} must contain key 'data'.")
+        data = z["data"]
+        index = z["index"] if "index" in z else np.arange(data.shape[0])
+        columns = z["columns"] if "columns" in z else np.arange(data.shape[1])
+        df = pd.DataFrame(data, index=index, columns=columns)
     else:
         raise ValueError(f"Unsupported file type: {path}")
 
-    # Only convert index to datetime if it's not already
-    if not isinstance(df.index, pd.DatetimeIndex):
-        df.index = pd.to_datetime(df.index)
-    # Force numeric; bad parses become NaN.
+    try:
+        if not isinstance(df.index, pd.DatetimeIndex):
+            parsed = pd.to_datetime(df.index, errors="raise")
+            df.index = parsed
+    except Exception:
+        pass
+
     df = df.apply(pd.to_numeric, errors="coerce")
     return df.sort_index()
 
 
-def align_signal_and_returns(signals: pd.DataFrame, returns: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def align_signal_and_returns(
+    signals: pd.DataFrame,
+    returns: pd.DataFrame,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     common_dates = signals.index.intersection(returns.index)
     common_cols = signals.columns.intersection(returns.columns)
+
     if len(common_dates) == 0:
         raise ValueError("No overlapping dates between signals and returns.")
     if len(common_cols) == 0:
         raise ValueError("No overlapping asset columns between signals and returns.")
+
     s = signals.loc[common_dates, common_cols].copy()
     r = returns.loc[common_dates, common_cols].copy()
+
+    s = s.sort_index().sort_index(axis=1)
+    r = r.sort_index().sort_index(axis=1)
     return s, r
 
 
-# -----------------------------------------------------------------------------
+# =============================================================================
 # Statistics helpers
-# -----------------------------------------------------------------------------
+# =============================================================================
 
-def benjamini_hochberg_mask(pvals: NDArray[np.float64], q: float) -> NDArray[np.bool_]:
-    """BH mask on a 2D p-value array; NaNs are always False."""
+def benjamini_hochberg_mask(
+    pvals: NDArray[np.float64],
+    q: float,
+) -> NDArray[np.bool_]:
     flat = pvals.ravel()
     valid = np.isfinite(flat)
     out = np.zeros_like(flat, dtype=bool)
+
     if not np.any(valid):
         return out.reshape(pvals.shape)
 
@@ -131,6 +139,7 @@ def benjamini_hochberg_mask(pvals: NDArray[np.float64], q: float) -> NDArray[np.
     order = np.argsort(pv)
     pv_sorted = pv[order]
     thresh = q * (np.arange(1, m + 1) / m)
+
     keep = pv_sorted <= thresh
     if not np.any(keep):
         return out.reshape(pvals.shape)
@@ -149,20 +158,26 @@ class EdgeStats:
     tstat: NDArray[np.float64]
     pval: NDArray[np.float64]
     count: NDArray[np.int64]
-    keep_mask: NDArray[np.bool_]
+    screened_mask: NDArray[np.bool_]
 
 
-def compute_edge_stats(signals_train: pd.DataFrame, returns_train: pd.DataFrame, min_count: int, fdr_q: float) -> EdgeStats:
+def compute_edge_stats(
+    signals_train: pd.DataFrame,
+    returns_train: pd.DataFrame,
+    min_count: int,
+    fdr_q: float,
+) -> EdgeStats:
     """
-    Compute pairwise statistics for x_{t,i,j} = R_{t,i} * P_{t-1,j}.
+    Pairwise source-target payoff statistics for:
 
-    Efficient formulas:
-      count_{ij} = sum_t 1{R_{ti} observed} 1{P_{t-1,j} observed}
-      sum_{ij}   = (R0.T @ P0)_{ij}
-      sumsq_{ij} = ((R0^2).T @ (P0^2))_{ij}
-    where missing entries are filled with 0 in R0 and P0.
+        x_{t, i, j} = R_{t, i} * P_{t-1, j}
+
+    where:
+        i = target asset
+        j = source asset
+
+    Returns matrices of shape [n_targets x n_sources].
     """
-    # Lag signals by one day inside the training window.
     P_lag = signals_train.shift(1)
 
     R = returns_train.to_numpy(dtype=float)
@@ -174,7 +189,7 @@ def compute_edge_stats(signals_train: pd.DataFrame, returns_train: pd.DataFrame,
     R0 = np.where(valid_r, R, 0.0)
     P0 = np.where(valid_p, P, 0.0)
 
-    count = valid_r.astype(np.int64).T @ valid_p.astype(np.int64)  # [target i, source j]
+    count = valid_r.astype(np.int64).T @ valid_p.astype(np.int64)
     prod_sum = R0.T @ P0
     prod_sumsq = (R0 * R0).T @ (P0 * P0)
 
@@ -184,7 +199,9 @@ def compute_edge_stats(signals_train: pd.DataFrame, returns_train: pd.DataFrame,
 
     sigma2 = np.full_like(prod_sum, np.nan, dtype=float)
     ok_var = count >= 2
-    sigma2[ok_var] = (prod_sumsq[ok_var] - count[ok_var] * mu[ok_var] ** 2) / (count[ok_var] - 1)
+    sigma2[ok_var] = (
+        prod_sumsq[ok_var] - count[ok_var] * mu[ok_var] ** 2
+    ) / (count[ok_var] - 1)
     sigma2 = np.where(np.isfinite(sigma2), np.maximum(sigma2, 0.0), np.nan)
     sigma = np.sqrt(sigma2)
 
@@ -201,8 +218,8 @@ def compute_edge_stats(signals_train: pd.DataFrame, returns_train: pd.DataFrame,
         pval[ok_sr] = 2.0 * stats.t.sf(np.abs(tstat[ok_sr]), df=df)
 
     enough_data = count >= min_count
-    bh_mask = benjamini_hochberg_mask(pval, q=fdr_q)
-    keep_mask = enough_data & bh_mask & np.isfinite(sr)
+    bh = benjamini_hochberg_mask(pval, q=fdr_q)
+    screened_mask = enough_data & bh & np.isfinite(sr)
 
     return EdgeStats(
         mu=mu,
@@ -211,33 +228,45 @@ def compute_edge_stats(signals_train: pd.DataFrame, returns_train: pd.DataFrame,
         tstat=tstat,
         pval=pval,
         count=count.astype(np.int64),
-        keep_mask=keep_mask,
+        screened_mask=screened_mask,
     )
 
 
-# -----------------------------------------------------------------------------
-# Dhillon-style co-clustering
-# -----------------------------------------------------------------------------
-
-def build_cluster_weight_matrix(stats_obj: EdgeStats, mode: str) -> NDArray[np.float64]:
-    """
-    Convert screened directed statistics to the NONNEGATIVE weight matrix W used
-    by Dhillon-style bipartite spectral co-clustering.
-    """
-    if mode == "abs_t":
-        base = np.abs(stats_obj.tstat)
-    elif mode == "abs_sr":
-        base = np.abs(stats_obj.sr)
-    elif mode == "positive_sr":
-        base = np.maximum(stats_obj.sr, 0.0)
-    elif mode == "positive_mu":
-        base = np.maximum(stats_obj.mu, 0.0)
+def choose_signed_score_matrix(
+    stats_obj: EdgeStats,
+    mode: str,
+) -> NDArray[np.float64]:
+    if mode == "sr":
+        S = stats_obj.sr
+    elif mode == "t":
+        S = stats_obj.tstat
+    elif mode == "mu":
+        S = stats_obj.mu
     else:
-        raise ValueError(f"Unknown cluster-weight mode: {mode}")
+        raise ValueError(f"Unknown BLOCK_SCORE_STAT: {mode}")
+    return np.where(np.isfinite(S), S, np.nan)
 
-    W = np.where(stats_obj.keep_mask & np.isfinite(base), base, 0.0)
-    return W
 
+def choose_nonnegative_cluster_matrix(
+    stats_obj: EdgeStats,
+    mode: str,
+) -> NDArray[np.float64]:
+    if mode == "abs_t":
+        A = np.abs(stats_obj.tstat)
+    elif mode == "abs_sr":
+        A = np.abs(stats_obj.sr)
+    elif mode == "positive_sr":
+        A = np.maximum(stats_obj.sr, 0.0)
+    elif mode == "positive_mu":
+        A = np.maximum(stats_obj.mu, 0.0)
+    else:
+        raise ValueError(f"Unknown CLUSTER_WEIGHT_STAT: {mode}")
+    return np.where(np.isfinite(A), A, 0.0)
+
+
+# =============================================================================
+# Dhillon co-clustering
+# =============================================================================
 
 @dataclass
 class CoClusterResult:
@@ -250,24 +279,25 @@ class CoClusterResult:
     col_degrees: NDArray[np.float64]
 
 
-def dhillon_coclustering(W: NDArray[np.float64], n_clusters: int, random_state: int = 0) -> CoClusterResult:
+def dhillon_coclustering(
+    W: NDArray[np.float64],
+    n_clusters: int,
+    random_state: int = 0,
+) -> CoClusterResult:
     """
-    Multipartition(k) from Dhillon (2001), adapted to a general nonnegative matrix W.
+    Dhillon multipartition:
 
-    We use:
-      Wn = D_r^{-1/2} W D_c^{-1/2}
-      ell = ceil(log2(k))
-    then compute the top ell+1 singular vectors, drop the trivial first one, form
-    the stacked embedding
-      Z = [D_r^{-1/2} U_{2:ell+1}; D_c^{-1/2} V_{2:ell+1}]
-    and run k-means jointly on rows+columns.
+        Wn = D_r^{-1/2} W D_c^{-1/2}
+        g  = ceil(log2(k))
+
+    Use the top g+1 singular vectors of Wn, drop the trivial first one,
+    build the stacked embedding, and run k-means jointly on rows + columns.
     """
-    if n_clusters < 2:
-        raise ValueError("n_clusters must be at least 2.")
-
     W = np.asarray(W, dtype=float)
     if W.ndim != 2:
         raise ValueError("W must be 2D.")
+    if n_clusters < 2:
+        raise ValueError("n_clusters must be at least 2.")
 
     n_rows, n_cols = W.shape
     row_deg = W.sum(axis=1)
@@ -279,21 +309,21 @@ def dhillon_coclustering(W: NDArray[np.float64], n_clusters: int, random_state: 
 
     Wn = (inv_sqrt_row[:, None] * W) * inv_sqrt_col[None, :]
 
-    ell = int(math.ceil(math.log2(n_clusters)))
-    n_components = min(ell + 1, min(n_rows, n_cols))
+    g = int(math.ceil(math.log2(n_clusters)))
+    n_components = min(g + 1, min(n_rows, n_cols))
+
     if n_components < 2:
-        # Extremely degenerate case.
         row_emb = np.zeros((n_rows, 1), dtype=float)
         col_emb = np.zeros((n_cols, 1), dtype=float)
         Z = np.vstack([row_emb, col_emb])
         km = KMeans(n_clusters=n_clusters, n_init=50, random_state=random_state)
         labels_all = km.fit_predict(Z)
         return CoClusterResult(
-            row_labels=labels_all[:n_rows],
-            col_labels=labels_all[n_rows:],
+            row_labels=labels_all[:n_rows].astype(int),
+            col_labels=labels_all[n_rows:].astype(int),
             row_embedding=row_emb,
             col_embedding=col_emb,
-            singular_values=np.array([]),
+            singular_values=np.array([], dtype=float),
             row_degrees=row_deg,
             col_degrees=col_deg,
         )
@@ -305,7 +335,6 @@ def dhillon_coclustering(W: NDArray[np.float64], n_clusters: int, random_state: 
         random_state=random_state,
     )
 
-    # Singular values already descending for randomized_svd.
     U_use = U[:, 1:n_components]
     V_use = Vt.T[:, 1:n_components]
 
@@ -313,14 +342,16 @@ def dhillon_coclustering(W: NDArray[np.float64], n_clusters: int, random_state: 
     col_emb = inv_sqrt_col[:, None] * V_use
     Z = np.vstack([row_emb, col_emb])
 
-    km = KMeans(n_clusters=n_clusters, n_init=50, random_state=random_state)
+    # Reduce silly warnings by capping k at number of unique embedding rows if needed.
+    n_unique = np.unique(np.round(Z, 12), axis=0).shape[0]
+    k_eff = min(n_clusters, max(2, n_unique))
+
+    km = KMeans(n_clusters=k_eff, n_init=50, random_state=random_state)
     labels_all = km.fit_predict(Z)
-    row_labels = labels_all[:n_rows].astype(int)
-    col_labels = labels_all[n_rows:].astype(int)
 
     return CoClusterResult(
-        row_labels=row_labels,
-        col_labels=col_labels,
+        row_labels=labels_all[:n_rows].astype(int),
+        col_labels=labels_all[n_rows:].astype(int),
         row_embedding=row_emb,
         col_embedding=col_emb,
         singular_values=s,
@@ -329,36 +360,24 @@ def dhillon_coclustering(W: NDArray[np.float64], n_clusters: int, random_state: 
     )
 
 
-# -----------------------------------------------------------------------------
-# Block scoring + portfolio construction
-# -----------------------------------------------------------------------------
-
-def choose_signed_score_matrix(stats_obj: EdgeStats, mode: str) -> NDArray[np.float64]:
-    if mode == "sr":
-        S = stats_obj.sr
-    elif mode == "t":
-        S = stats_obj.tstat
-    elif mode == "mu":
-        S = stats_obj.mu
-    else:
-        raise ValueError(f"Unknown block-score-stat mode: {mode}")
-    return np.where(np.isfinite(S), S, np.nan)
-
+# =============================================================================
+# Block selection and portfolio construction
+# =============================================================================
 
 @dataclass
 class BlockSelection:
     row_cluster: int
     col_cluster: int
-    row_idx: NDArray[np.int64]
-    col_idx: NDArray[np.int64]
+    row_idx: NDArray[np.int64]      # targets
+    col_idx: NDArray[np.int64]      # sources
     block_score: float
     source_weights: NDArray[np.float64]
     target_loadings: NDArray[np.float64]
-    block_edge_count: int
+    n_edges_used: int
+    mask_name: str
 
 
-def _safe_l1_normalize(x: NDArray[np.float64]) -> NDArray[np.float64]:
-    x = np.asarray(x, dtype=float)
+def safe_l1_normalize(x: NDArray[np.float64]) -> NDArray[np.float64]:
     denom = np.sum(np.abs(x))
     if not np.isfinite(denom) or denom <= 0:
         return np.zeros_like(x)
@@ -368,15 +387,17 @@ def _safe_l1_normalize(x: NDArray[np.float64]) -> NDArray[np.float64]:
 def select_best_block(
     coclust: CoClusterResult,
     stats_obj: EdgeStats,
-    block_score_stat: str = "sr",
-    weight_by_count: bool = True,
+    usable_mask: NDArray[np.bool_],
+    mask_name: str,
+    block_score_stat: str,
     allow_same_cluster_pair: bool = True,
+    weight_by_count: bool = True,
 ) -> BlockSelection:
     """
-    Pick the best row-cluster / column-cluster block using the SIGNED training matrix.
+    Score row-cluster / column-cluster blocks on the SIGNED training matrix.
 
-    The score is a counts-weighted mean of the chosen signed stat across screened edges.
-    The resulting per-source and per-target weights are signed row/column means inside the block.
+    Rows = targets
+    Cols = sources
     """
     S = choose_signed_score_matrix(stats_obj, block_score_stat)
     K = int(max(coclust.row_labels.max(initial=0), coclust.col_labels.max(initial=0)) + 1)
@@ -387,32 +408,31 @@ def select_best_block(
         rows = np.where(coclust.row_labels == rc)[0]
         if rows.size == 0:
             continue
+
         for cc in range(K):
             if (not allow_same_cluster_pair) and (rc == cc):
                 continue
+
             cols = np.where(coclust.col_labels == cc)[0]
             if cols.size == 0:
                 continue
 
-            sub_keep = stats_obj.keep_mask[np.ix_(rows, cols)]
-            if not np.any(sub_keep):
-                continue
-
-            sub_S = S[np.ix_(rows, cols)]
-            sub_counts = stats_obj.count[np.ix_(rows, cols)].astype(float)
-            good = sub_keep & np.isfinite(sub_S)
+            good = usable_mask[np.ix_(rows, cols)] & np.isfinite(S[np.ix_(rows, cols)])
             if not np.any(good):
                 continue
 
+            sub_S = S[np.ix_(rows, cols)]
+            sub_count = stats_obj.count[np.ix_(rows, cols)].astype(float)
+
             if weight_by_count:
-                w = np.where(good, sub_counts, 0.0)
+                w = np.where(good, sub_count, 0.0)
                 denom = w.sum()
-                block_score = float(np.sum(np.where(good, sub_S * w, 0.0)) / denom) if denom > 0 else np.nan
+                if denom <= 0:
+                    continue
+                block_score = float(np.sum(np.where(good, sub_S * w, 0.0)) / denom)
             else:
                 block_score = float(np.nanmean(np.where(good, sub_S, np.nan)))
 
-            # Source weights = signed average strength of each source column within this block.
-            # Target loadings = signed average strength of each target row within this block.
             col_num = np.nansum(np.where(good, sub_S, np.nan), axis=0)
             col_den = np.sum(good, axis=0)
             row_num = np.nansum(np.where(good, sub_S, np.nan), axis=1)
@@ -421,10 +441,10 @@ def select_best_block(
             source_raw = np.divide(col_num, col_den, out=np.zeros_like(col_num), where=col_den > 0)
             target_raw = np.divide(row_num, row_den, out=np.zeros_like(row_num), where=row_den > 0)
 
-            source_w = _safe_l1_normalize(source_raw)
-            target_b = _safe_l1_normalize(target_raw)
+            source_weights = safe_l1_normalize(source_raw)
+            target_loadings = safe_l1_normalize(target_raw)
 
-            if np.sum(np.abs(source_w)) == 0 or np.sum(np.abs(target_b)) == 0:
+            if np.sum(np.abs(source_weights)) == 0 or np.sum(np.abs(target_loadings)) == 0:
                 continue
 
             cand = BlockSelection(
@@ -433,82 +453,164 @@ def select_best_block(
                 row_idx=rows.astype(int),
                 col_idx=cols.astype(int),
                 block_score=block_score,
-                source_weights=source_w,
-                target_loadings=target_b,
-                block_edge_count=int(np.sum(good)),
+                source_weights=source_weights,
+                target_loadings=target_loadings,
+                n_edges_used=int(np.sum(good)),
+                mask_name=mask_name,
             )
+
             if best is None or (np.isfinite(cand.block_score) and cand.block_score > best.block_score):
                 best = cand
 
     if best is None:
-        raise RuntimeError("No valid source-target block was found. Try loosening q/min_count or changing stats.")
+        raise RuntimeError("No valid block found under this mask.")
     return best
 
 
-# -----------------------------------------------------------------------------
+def choose_block_with_fallbacks(
+    stats_obj: EdgeStats,
+    n_clusters: int,
+    cluster_weight_stat: str,
+    block_score_stat: str,
+    allow_same_cluster_pair: bool,
+    random_state: int,
+    min_count: int,
+) -> Tuple[BlockSelection, CoClusterResult]:
+    """
+    Try progressively looser masks so the strategy stays active:
+
+    1) screened_mask = min_count + BH-FDR
+    2) count_only    = min_count only
+    3) finite_any    = any finite positive edge
+    """
+    base_nonneg = choose_nonnegative_cluster_matrix(stats_obj, cluster_weight_stat)
+
+    masks = [
+        ("screened", stats_obj.screened_mask),
+        ("count_only", (stats_obj.count >= min_count) & np.isfinite(base_nonneg)),
+        ("finite_any", np.isfinite(base_nonneg) & (base_nonneg > 0)),
+    ]
+
+    last_err: Optional[Exception] = None
+
+    for mask_name, usable_mask in masks:
+        if not np.any(usable_mask):
+            continue
+
+        W = np.where(usable_mask, base_nonneg, 0.0)
+        if not np.any(W > 0):
+            continue
+
+        try:
+            coclust = dhillon_coclustering(W, n_clusters=n_clusters, random_state=random_state)
+            block = select_best_block(
+                coclust=coclust,
+                stats_obj=stats_obj,
+                usable_mask=usable_mask,
+                mask_name=mask_name,
+                block_score_stat=block_score_stat,
+                allow_same_cluster_pair=allow_same_cluster_pair,
+                weight_by_count=True,
+            )
+            return block, coclust
+        except Exception as err:
+            last_err = err
+
+    if last_err is not None:
+        raise last_err
+    raise RuntimeError("No usable mask produced a valid block.")
+
+
+def make_daily_positions(
+    lagged_signal_today: pd.Series,
+    n_assets: int,
+    block: BlockSelection,
+) -> NDArray[np.float64]:
+    """
+    Daily trade using the CURRENT block:
+
+        z_t = sum_{j in S} w_j * P_{t-1,j}
+        p_raw_i = b_i * z_t for i in T
+        normalize to unit gross leverage
+
+    If some sources are missing today, renormalize over available sources.
+    """
+    pos = np.zeros(n_assets, dtype=float)
+
+    src = lagged_signal_today.iloc[block.col_idx].to_numpy(dtype=float)
+    good = np.isfinite(src)
+    if not np.any(good):
+        return pos
+
+    src_w = safe_l1_normalize(block.source_weights[good])
+    if np.sum(np.abs(src_w)) == 0:
+        return pos
+
+    z_t = float(np.dot(src_w, src[good]))
+    raw = block.target_loadings * z_t
+
+    gross = np.sum(np.abs(raw))
+    if not np.isfinite(gross) or gross <= 0:
+        return pos
+
+    pos[block.row_idx] = raw / gross
+    return pos
+
+
+# =============================================================================
 # Backtest
-# -----------------------------------------------------------------------------
+# =============================================================================
 
 @dataclass
-class RebalanceRecord:
-    rebalance_date: str
-    train_start: str
-    train_end: str
-    test_start: str
-    test_end: str
+class DailyRecord:
+    date: str
+    gross_pnl: float
+    net_pnl: float
+    turnover: float
+    gross_exposure: float
     row_cluster: int
     col_cluster: int
     n_targets: int
     n_sources: int
     block_score: float
-    block_edge_count: int
+    mask_name: str
 
 
-def make_daily_positions(
-    signals_lag_day: pd.Series,
-    n_assets: int,
-    block: BlockSelection,
-) -> NDArray[np.float64]:
-    """
-    Position rule:
-      z_t = sum_{j in S} w_j * P_{t-1,j}
-      p_raw_i = b_i * z_t for i in T
-      then normalize to unit gross leverage.
-    """
-    p = np.zeros(n_assets, dtype=float)
-    src_signal = signals_lag_day.iloc[block.col_idx].to_numpy(dtype=float)
-    if np.any(~np.isfinite(src_signal)):
-        # Missing sources on this day -> no trade.
-        return p
-
-    z_t = float(np.dot(block.source_weights, src_signal))
-    raw = block.target_loadings * z_t
-    gross = np.sum(np.abs(raw))
-    if not np.isfinite(gross) or gross <= 0:
-        return p
-    p[block.row_idx] = raw / gross
-    return p
+@dataclass
+class BlockHistoryRecord:
+    rebalance_date: str
+    train_start: str
+    train_end: str
+    row_cluster: int
+    col_cluster: int
+    n_targets: int
+    n_sources: int
+    block_score: float
+    n_edges_used: int
+    mask_name: str
 
 
-def summarize_performance(bt: pd.DataFrame) -> Dict[str, float]:
-    out: Dict[str, float] = {}
+def summarize_performance(bt: pd.DataFrame) -> dict:
+    out: dict = {}
+
     for col in ["gross_pnl", "net_pnl"]:
         x = bt[col].to_numpy(dtype=float)
         x = x[np.isfinite(x)]
+
         if x.size == 0:
             out[f"{col}_mean"] = np.nan
             out[f"{col}_vol"] = np.nan
             out[f"{col}_sharpe"] = np.nan
             out[f"{col}_cum"] = np.nan
             continue
+
         mu = float(np.mean(x))
         vol = float(np.std(x, ddof=1)) if x.size >= 2 else np.nan
         sharpe = float(np.sqrt(252.0) * mu / vol) if np.isfinite(vol) and vol > 0 else np.nan
-        cum = float(np.sum(x))
         out[f"{col}_mean"] = mu
         out[f"{col}_vol"] = vol
         out[f"{col}_sharpe"] = sharpe
-        out[f"{col}_cum"] = cum
+        out[f"{col}_cum"] = float(np.sum(x))
 
     active = bt["gross_exposure"] > 0
     x = bt.loc[active, "net_pnl"].to_numpy(dtype=float)
@@ -518,12 +620,14 @@ def summarize_performance(bt: pd.DataFrame) -> Dict[str, float]:
         sharpe = float(np.sqrt(252.0) * mu / vol) if np.isfinite(vol) and vol > 0 else np.nan
     else:
         sharpe = np.nan
+
     out["active_only_net_sharpe"] = sharpe
     out["active_days"] = int(active.sum())
     out["total_days"] = int(bt.shape[0])
     out["active_fraction"] = float(active.mean()) if bt.shape[0] > 0 else np.nan
     out["avg_turnover"] = float(bt["turnover"].mean()) if bt.shape[0] > 0 else np.nan
     out["avg_gross_exposure"] = float(bt["gross_exposure"].mean()) if bt.shape[0] > 0 else np.nan
+
     return out
 
 
@@ -531,7 +635,7 @@ def run_walk_forward(
     signals: pd.DataFrame,
     returns: pd.DataFrame,
     train_days: int,
-    rebalance_days: int,
+    recluster_days: int,
     n_clusters: int,
     fdr_q: float,
     min_count: int,
@@ -540,160 +644,200 @@ def run_walk_forward(
     cost_bps: float,
     allow_same_cluster_pair: bool,
     random_state: int,
-) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, float]]:
-
+) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
+    """
+    Daily trading, but only recompute the block every `recluster_days`.
+    """
     dates = signals.index
     n_assets = signals.shape[1]
-    tickers = list(signals.columns)
+    lagged_signals = signals.shift(1)
 
-    records: List[Dict[str, float]] = []
-    rebalance_records: List[RebalanceRecord] = []
+    daily_records: list[DailyRecord] = []
+    block_history: list[BlockHistoryRecord] = []
 
     prev_pos = np.zeros(n_assets, dtype=float)
     cost_rate = cost_bps / 1e4
 
-    # Need at least train_days + 1 because signals are lagged by 1 internally.
-    start_idx = train_days
-    t0 = start_idx
-    while t0 < len(dates):
-        train_slice = slice(t0 - train_days, t0)
-        test_slice = slice(t0, min(t0 + rebalance_days, len(dates)))
+    current_block: Optional[BlockSelection] = None
 
-        s_train = signals.iloc[train_slice]
-        r_train = returns.iloc[train_slice]
-        stats_obj = compute_edge_stats(s_train, r_train, min_count=min_count, fdr_q=fdr_q)
+    for t in range(train_days, len(dates)):
+        need_recluster = (current_block is None) or ((t - train_days) % recluster_days == 0)
 
-        W = build_cluster_weight_matrix(stats_obj, mode=cluster_weight_stat)
-        coclust = dhillon_coclustering(W, n_clusters=n_clusters, random_state=random_state)
-        block = select_best_block(
-            coclust,
-            stats_obj,
-            block_score_stat=block_score_stat,
-            weight_by_count=True,
-            allow_same_cluster_pair=allow_same_cluster_pair,
+        if need_recluster:
+            train_slice = slice(t - train_days, t)
+            s_train = signals.iloc[train_slice]
+            r_train = returns.iloc[train_slice]
+
+            stats_obj = compute_edge_stats(
+                signals_train=s_train,
+                returns_train=r_train,
+                min_count=min_count,
+                fdr_q=fdr_q,
+            )
+
+            current_block, _ = choose_block_with_fallbacks(
+                stats_obj=stats_obj,
+                n_clusters=n_clusters,
+                cluster_weight_stat=cluster_weight_stat,
+                block_score_stat=block_score_stat,
+                allow_same_cluster_pair=allow_same_cluster_pair,
+                random_state=random_state,
+                min_count=min_count,
+            )
+
+            block_history.append(
+                BlockHistoryRecord(
+                    rebalance_date=str(dates[t].date()) if isinstance(dates[t], pd.Timestamp) else str(dates[t]),
+                    train_start=str(dates[t - train_days].date()) if isinstance(dates[t - train_days], pd.Timestamp) else str(dates[t - train_days]),
+                    train_end=str(dates[t - 1].date()) if isinstance(dates[t - 1], pd.Timestamp) else str(dates[t - 1]),
+                    row_cluster=int(current_block.row_cluster),
+                    col_cluster=int(current_block.col_cluster),
+                    n_targets=int(current_block.row_idx.size),
+                    n_sources=int(current_block.col_idx.size),
+                    block_score=float(current_block.block_score),
+                    n_edges_used=int(current_block.n_edges_used),
+                    mask_name=current_block.mask_name,
+                )
+            )
+
+        assert current_block is not None
+
+        pos = make_daily_positions(
+            lagged_signal_today=lagged_signals.iloc[t],
+            n_assets=n_assets,
+            block=current_block,
         )
 
-        rebalance_records.append(
-            RebalanceRecord(
-                rebalance_date=str(dates[t0].date()),
-                train_start=str(dates[t0 - train_days].date()),
-                train_end=str(dates[t0 - 1].date()),
-                test_start=str(dates[test_slice.start].date()),
-                test_end=str(dates[test_slice.stop - 1].date()),
-                row_cluster=int(block.row_cluster),
-                col_cluster=int(block.col_cluster),
-                n_targets=int(block.row_idx.size),
-                n_sources=int(block.col_idx.size),
-                block_score=float(block.block_score),
-                block_edge_count=int(block.block_edge_count),
+        ret = returns.iloc[t].to_numpy(dtype=float)
+        gross_pnl = float(np.nansum(np.where(np.isfinite(ret), pos * ret, 0.0)))
+        turnover = float(np.sum(np.abs(pos - prev_pos)))
+        net_pnl = gross_pnl - cost_rate * turnover
+        gross_exposure = float(np.sum(np.abs(pos)))
+
+        daily_records.append(
+            DailyRecord(
+                date=str(dates[t].date()) if isinstance(dates[t], pd.Timestamp) else str(dates[t]),
+                gross_pnl=gross_pnl,
+                net_pnl=net_pnl,
+                turnover=turnover,
+                gross_exposure=gross_exposure,
+                row_cluster=int(current_block.row_cluster),
+                col_cluster=int(current_block.col_cluster),
+                n_targets=int(current_block.row_idx.size),
+                n_sources=int(current_block.col_idx.size),
+                block_score=float(current_block.block_score),
+                mask_name=current_block.mask_name,
             )
         )
 
-        for tt in range(test_slice.start, test_slice.stop):
-            d = dates[tt]
-            sig_lag = signals.shift(1).iloc[tt]
-            pos = make_daily_positions(sig_lag, n_assets, block)
-            ret = returns.iloc[tt].to_numpy(dtype=float)
+        prev_pos = pos
 
-            gross_pnl = float(np.nansum(np.where(np.isfinite(ret), pos * ret, 0.0)))
-            turnover = float(np.sum(np.abs(pos - prev_pos)))
-            net_pnl = gross_pnl - cost_rate * turnover
-            gross_exposure = float(np.sum(np.abs(pos)))
-
-            records.append(
-                {
-                    "date": d,
-                    "gross_pnl": gross_pnl,
-                    "net_pnl": net_pnl,
-                    "turnover": turnover,
-                    "gross_exposure": gross_exposure,
-                    "row_cluster": int(block.row_cluster),
-                    "col_cluster": int(block.col_cluster),
-                    "n_targets": int(block.row_idx.size),
-                    "n_sources": int(block.col_idx.size),
-                    "block_score": float(block.block_score),
-                }
+        if (t - train_days + 1) % 50 == 0:
+            print(
+                f"Processed {t - train_days + 1}/{len(dates) - train_days} trade days | "
+                f"date={daily_records[-1].date} | "
+                f"mask={current_block.mask_name} | "
+                f"score={current_block.block_score:.6f}"
             )
-            prev_pos = pos
 
-        t0 += rebalance_days
+    bt = pd.DataFrame([asdict(x) for x in daily_records]).set_index("date")
+    bh = pd.DataFrame([asdict(x) for x in block_history])
 
-    bt = pd.DataFrame(records).set_index("date")
-    rebal = pd.DataFrame([asdict(x) for x in rebalance_records])
     summary = summarize_performance(bt)
-    summary["n_clusters"] = int(n_clusters)
     summary["train_days"] = int(train_days)
-    summary["rebalance_days"] = int(rebalance_days)
+    summary["recluster_days"] = int(recluster_days)
+    summary["n_clusters"] = int(n_clusters)
     summary["fdr_q"] = float(fdr_q)
     summary["min_count"] = int(min_count)
-    summary["cost_bps"] = float(cost_bps)
     summary["cluster_weight_stat"] = cluster_weight_stat
     summary["block_score_stat"] = block_score_stat
+    summary["cost_bps"] = float(cost_bps)
     summary["n_assets"] = int(n_assets)
     summary["n_backtest_days"] = int(bt.shape[0])
-    return bt, rebal, summary
+
+    return bt, bh, summary
 
 
-# -----------------------------------------------------------------------------
-# CLI
-# -----------------------------------------------------------------------------
+# =============================================================================
+# CLI / main
+# =============================================================================
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Dhillon-style bipartite spectral co-clustering for source-target OFI networks")
-    p.add_argument("--signals", default="data/processed/P.npy", help="Wide daily signal matrix P (dates x assets)")
-    p.add_argument("--returns", default="data/processed/R.npy", help="Wide daily return matrix R (dates x assets)")
-    p.add_argument("--outdir", required=True, help="Directory for outputs")
+    p = argparse.ArgumentParser(description="Dhillon bipartite source-target backtest with daily trading and slower reclustering")
+    p.add_argument("--signals", default=str(SIGNALS_PATH))
+    p.add_argument("--returns", default=str(RETURNS_PATH))
+    p.add_argument("--outdir", default=str(OUT_DIR))
 
-    p.add_argument("--train-days", type=int, default=252)
-    p.add_argument("--rebalance-days", type=int, default=5)
-    p.add_argument("--n-clusters", type=int, default=6)
-    p.add_argument("--fdr-q", type=float, default=0.10)
-    p.add_argument("--min-count", type=int, default=120)
-    p.add_argument("--cluster-weight-stat", choices=["abs_t", "abs_sr", "positive_sr", "positive_mu"], default="abs_t")
-    p.add_argument("--block-score-stat", choices=["sr", "t", "mu"], default="sr")
-    p.add_argument("--cost-bps", type=float, default=5.0)
+    p.add_argument("--train-days", type=int, default=TRAIN_DAYS)
+    p.add_argument("--recluster-days", type=int, default=RECLUSTER_DAYS)
+    p.add_argument("--n-clusters", type=int, default=N_CLUSTERS)
+    p.add_argument("--fdr-q", type=float, default=FDR_Q)
+    p.add_argument("--min-count", type=int, default=MIN_COUNT)
+    p.add_argument("--cluster-weight-stat", choices=["abs_t", "abs_sr", "positive_sr", "positive_mu"], default=CLUSTER_WEIGHT_STAT)
+    p.add_argument("--block-score-stat", choices=["sr", "t", "mu"], default=BLOCK_SCORE_STAT)
+    p.add_argument("--cost-bps", type=float, default=COST_BPS)
     p.add_argument("--disallow-same-cluster-pair", action="store_true")
-    p.add_argument("--random-state", type=int, default=0)
+    p.add_argument("--random-state", type=int, default=RANDOM_STATE)
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    outdir = Path(args.outdir)
-    outdir.mkdir(parents=True, exist_ok=True)
 
-    signals = _read_matrix(args.signals)
-    returns = _read_matrix(args.returns)
+    signals_path = Path(args.signals)
+    returns_path = Path(args.returns)
+    out_dir = Path(args.outdir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    signals = read_matrix(signals_path)
+    returns = read_matrix(returns_path)
     signals, returns = align_signal_and_returns(signals, returns)
 
-    bt, rebal, summary = run_walk_forward(
+    if len(signals) <= args.train_days:
+        raise ValueError(
+            f"Not enough rows for train_days={args.train_days}. "
+            f"Need more than {args.train_days}, got {len(signals)}."
+        )
+
+    print("Signals shape:", signals.shape)
+    print("Returns shape:", returns.shape)
+    print("Start date:", signals.index[0])
+    print("End date:", signals.index[-1])
+    print("Training window:", args.train_days)
+    print("Recluster every:", args.recluster_days, "days")
+    print("Clusters:", args.n_clusters)
+    print("Trading every day:", True)
+
+    bt, bh, summary = run_walk_forward(
         signals=signals,
         returns=returns,
-        train_days=args.train_days,
-        rebalance_days=args.rebalance_days,
-        n_clusters=args.n_clusters,
-        fdr_q=args.fdr_q,
-        min_count=args.min_count,
+        train_days=int(args.train_days),
+        recluster_days=int(args.recluster_days),
+        n_clusters=int(args.n_clusters),
+        fdr_q=float(args.fdr_q),
+        min_count=int(args.min_count),
         cluster_weight_stat=args.cluster_weight_stat,
         block_score_stat=args.block_score_stat,
-        cost_bps=args.cost_bps,
+        cost_bps=float(args.cost_bps),
         allow_same_cluster_pair=not args.disallow_same_cluster_pair,
-        random_state=args.random_state,
+        random_state=int(args.random_state),
     )
 
-    bt.to_csv(outdir / "daily_backtest.csv")
-    rebal.to_csv(outdir / "rebalance_history.csv", index=False)
+    bt.to_csv(out_dir / "daily_backtest.csv")
+    bh.to_csv(out_dir / "daily_block_history.csv", index=False)
 
-    with open(outdir / "summary.json", "w") as f:
-        json.dump(summary, f, indent=2)
-
-    # Save cumulative PnL series for convenience.
     cum = pd.DataFrame(index=bt.index)
     cum["cum_gross_pnl"] = bt["gross_pnl"].cumsum()
     cum["cum_net_pnl"] = bt["net_pnl"].cumsum()
-    cum.to_csv(outdir / "cumulative_pnl.csv")
+    cum.to_csv(out_dir / "cumulative_pnl.csv")
 
-    print("Saved outputs to:", outdir)
+    summary["signals_path"] = str(signals_path)
+    summary["returns_path"] = str(returns_path)
+
+    with open(out_dir / "summary.json", "w") as f:
+        json.dump(summary, f, indent=2)
+
+    print("\nSaved outputs to:", out_dir.resolve())
     print(json.dumps(summary, indent=2))
 
 

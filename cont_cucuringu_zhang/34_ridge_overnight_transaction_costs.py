@@ -74,7 +74,7 @@ MAX_ASSETS       = 400
 HALF_LIFE_SWEEP  = [15, 20, 25, 30, 35, 40, 45, 60, 90]
 Q                = 0.10
 MIN_TICKER_OBS   = 252
-MIN_SECTOR_ASSETS        = 2
+MIN_SECTOR_ASSETS        = 4
 MIN_NAMES_PER_SECTOR_NEUTRAL = 4
 
 INITIAL_TRAIN_DAYS = 750
@@ -147,7 +147,10 @@ def _mp_eigenvalue_median(beta: float) -> float:
 def gavish_donoho_denoise(M: np.ndarray) -> tuple[np.ndarray, int, float]:
     M = np.asarray(M, dtype=float)
     m, n = M.shape
-    U, s, Vt = np.linalg.svd(M, full_matrices=False)
+    try:
+        U, s, Vt = np.linalg.svd(M, full_matrices=False)
+    except np.linalg.LinAlgError:
+        return M.copy(), 0, 0.0
     if s.size == 0 or s.max() < 1e-14:
         return M.copy(), 0, 0.0
     y_med = float(np.median(s))
@@ -564,6 +567,10 @@ if USE_LAST_N_YEARS is not None:
 df = df.sort_values(["date", "ticker"]).reset_index(drop=True)
 df[minute_cols] = df[minute_cols].fillna(0.0)
 df = df.dropna(subset=["ticker", "date", "sector"]).copy()
+# Drop GOOGL — GOOG and GOOGL are both Alphabet share classes with nearly
+# identical LOB signals; keeping both double-counts Alphabet in Communication
+# Services and introduces near-collinear features. Keep GOOG (Class C, higher volume).
+df = df[df["ticker"] != "GOOGL"].copy()
 
 sector_counts = df[["ticker", "sector"]].drop_duplicates().groupby("ticker").size()
 df = df[df["ticker"].isin(sector_counts[sector_counts == 1].index)].copy()
