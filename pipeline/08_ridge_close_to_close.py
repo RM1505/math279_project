@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """08_ridge_close_to_close.py
 
-Same rolling ridge framework as 31 (overnight), but predicts CLOSE-TO-CLOSE
+Same rolling ridge framework as 07 (overnight), but predicts CLOSE-TO-CLOSE
 returns (24-hour period from close_t to close_{t+1}).
 
 Signal:  exp-decay weighted intraday OFI on day t  (emphasis toward close)

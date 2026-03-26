@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """04_directed_source_target.py
 
-Directed source-target baseline (Cucuringu-Zhang §2) applied to the
-exp-decay OFI feature table used in scripts 27 / 31 / 33.
+Directed source-target (DST) biclustering applied to the same exp-decay OFI
+feature table used by the ridge scripts (06, 07, 09, 10).
 
-Method (from script 12)
------------------------
+Method
+------
 For each ordered pair (i, j), define:
     X_t(i,j) = R[t,i] * P[t-1,j]      (return of i, lagged OFI of j)
 Estimate the "edge Sharpe":
@@ -25,13 +25,11 @@ via alternating top-k column/row updates on the surviving W matrix.
 Prediction score for stock i at time t:
     score_i = Σ_{j in S} W[i,j] * P[t-1, j]      (W[i,j] = A[i,j] * keep)
 
-Scores are evaluated identically to scripts 27/33:
+Scores are evaluated identically to the ridge scripts (06/09):
   - gross top-q spread (top 10% minus bottom 10%)
   - sector-neutral spread (rank within sector)
 
-Also computes the native l1-norm P&L from script 12 for reference.
-
-Walk-forward cadence: 750-day train, 21-day step — identical to script 27.
+Walk-forward cadence: 750-day train, 21-day step — identical to script 06.
 
 Outputs → results/rolling_adjacency_dst/
 
@@ -146,7 +144,7 @@ def annualize_sharpe(daily_sharpe: float) -> float:
 
 
 # ============================================================
-# core directed source-target functions  (from script 12)
+# core directed source-target functions
 # ============================================================
 @dataclass
 class EdgeStats:
@@ -311,7 +309,7 @@ for hl in HALF_LIFE_SWEEP:
 
 all_dates = np.sort(df["date"].unique())
 
-# coverage filter (using hl=45 proxy, same as script 27)
+# coverage filter (using hl=45 proxy, same as script 06)
 sig_proxy = df.pivot(index="date", columns="ticker", values="ofi_hl45")
 ret_proxy = df.pivot(index="date", columns="ticker", values="residual_ret")
 cd = sig_proxy.index.intersection(ret_proxy.index)

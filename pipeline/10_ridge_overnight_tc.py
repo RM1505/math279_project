@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """10_ridge_overnight_tc.py
 
-Transaction-cost-aware version of the overnight rolling ridge strategy (script 31).
+Transaction-cost-aware version of the overnight rolling ridge strategy (script 07).
 
 Signal:  exp-decay weighted intraday OFI on day t  (emphasis toward close)
 Target:  overnight_resid_t = (Open_{t+1}/Close_t - 1) - beta * SPY_overnight_t
@@ -276,7 +276,7 @@ def evaluate_predictions(pred_df, ret_df, ticker_to_sector, q, min_sn):
 
 
 # ============================================================
-# portfolio weight construction (from script 33)
+# portfolio weight construction
 # ============================================================
 def build_gross_weights(pred_row: pd.Series, q: float) -> pd.Series:
     """Equal-weight long top-q, short bottom-q across all assets.
@@ -346,7 +346,7 @@ def build_sn_weights(
 
 
 # ============================================================
-# transaction cost computation (from script 33)
+# transaction cost computation
 # ============================================================
 def compute_turnover_series(
     pred_df: pd.DataFrame,

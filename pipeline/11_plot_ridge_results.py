@@ -3,10 +3,10 @@
 
 Comprehensive figures for the Math 279 write-up.
 Compiles results from:
-  27  —  next-day OPCL rolling ridge
-  31  —  overnight (close→open) rolling ridge
-  33  —  next-day + transaction costs
-  34  —  overnight + transaction costs
+  06  —  next-day OPCL rolling ridge
+  07  —  overnight (close→open) rolling ridge
+  09  —  next-day + transaction costs
+  10  —  overnight + transaction costs
 
 Outputs all figures to results/figures/.
 """
@@ -30,10 +30,10 @@ from scipy.stats import spearmanr
 # ============================================================
 INPUT_PATH      = Path("data/processed/feature_table_with_residuals_10level.csv")
 OVERNIGHT_CACHE = Path("data/processed/overnight_returns_residualized.csv")
-DIR_27 = Path("results/rolling_adjacency_ridge")
-DIR_31 = Path("results/rolling_adjacency_ridge_overnight")
-DIR_33 = Path("results/rolling_adjacency_ridge_tc")
-DIR_34 = Path("results/rolling_adjacency_ridge_overnight_tc")
+DIR_06 = Path("results/rolling_adjacency_ridge")
+DIR_07 = Path("results/rolling_adjacency_ridge_overnight")
+DIR_09 = Path("results/rolling_adjacency_ridge_tc")
+DIR_10 = Path("results/rolling_adjacency_ridge_overnight_tc")
 OUT    = Path("results/figures")
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -215,21 +215,21 @@ ret_nd.index = pd.to_datetime(ret_nd.index)
 ret_on = pd.read_csv(OVERNIGHT_CACHE, index_col=0, parse_dates=True)
 
 print("Loading summaries...", flush=True)
-sum27 = pd.read_csv(DIR_27 / "rolling_summary_all_models.csv")
-sum31 = pd.read_csv(DIR_31 / "rolling_summary_all_models.csv")
-sum33 = pd.read_csv(DIR_33 / "rolling_summary_all_models.csv")
-sum34 = pd.read_csv(DIR_34 / "rolling_summary_all_models.csv")
+sum_nd = pd.read_csv(DIR_06 / "rolling_summary_all_models.csv")
+sum_on = pd.read_csv(DIR_07 / "rolling_summary_all_models.csv")
+sum_nd_tc = pd.read_csv(DIR_09 / "rolling_summary_all_models.csv")
+sum_on_tc = pd.read_csv(DIR_10 / "rolling_summary_all_models.csv")
 
-for s, lmap in [(sum27, ND_LABEL), (sum33, ND_LABEL),
-                (sum31, ON_LABEL), (sum34, ON_LABEL)]:
+for s, lmap in [(sum_nd, ND_LABEL), (sum_nd_tc, ND_LABEL),
+                (sum_on, ON_LABEL), (sum_on_tc, ON_LABEL)]:
     s["label"] = s["model"].map(lmap).fillna(s["model"])
 
 print("Computing spread / IC series...", flush=True)
 spread_nd, ic_nd = {}, {}
 for m in FOCUS_ND:
-    pred = load_pred(DIR_27, m)
+    pred = load_pred(DIR_06, m)
     if pred.empty:
-        pred = load_pred(DIR_33, m)
+        pred = load_pred(DIR_09, m)
     if pred.empty:
         continue
     spread_nd[m] = gross_spread_series(pred, ret_nd)
@@ -238,9 +238,9 @@ for m in FOCUS_ND:
 
 spread_on, ic_on = {}, {}
 for m in FOCUS_ON:
-    pred = load_pred(DIR_31, m)
+    pred = load_pred(DIR_07, m)
     if pred.empty:
-        pred = load_pred(DIR_34, m)
+        pred = load_pred(DIR_10, m)
     if pred.empty:
         continue
     spread_on[m] = gross_spread_series(pred, ret_on)
@@ -269,7 +269,7 @@ def _tbl_nd(df):
 fig, ax = plt.subplots(figsize=(13, 6))
 fig.suptitle("Next-Day Strategy — All Model Results  (MSA=4, GOOG only)", fontsize=13, fontweight="bold", y=1.01)
 cols = ["Model", "Gross Sharpe", "SN Sharpe", "Mean IC", "HL (min)", "GD"]
-rows = _tbl_nd(sum27)
+rows = _tbl_nd(sum_nd)
 style_table(ax, cols, rows, green_cols=[1, 2], fontsize=9)
 save("01_table_nextday_all_models.png")
 
@@ -280,7 +280,7 @@ fig, ax = plt.subplots(figsize=(13, 6))
 fig.suptitle("Overnight Strategy — All Model Results  (MSA=4, GOOG only)", fontsize=13, fontweight="bold", y=1.01)
 cols = ["Model", "Gross Sharpe", "SN Sharpe", "Mean IC", "HL (min)", "GD"]
 rows = []
-for _, r in sum31.sort_values("annualized_spread_sharpe", ascending=False).iterrows():
+for _, r in sum_on.sort_values("annualized_spread_sharpe", ascending=False).iterrows():
     rows.append([
         ON_LABEL.get(r["model"], r["model"]),
         f"{r['annualized_spread_sharpe']:.2f}",
@@ -300,7 +300,7 @@ fig.suptitle("Next-Day + Transaction Costs — All Models  (Script 33)", fontsiz
 tc_cols = ["Model", "Gross Sharpe", "SN Sharpe", "τ daily", "Ann τ", "BE (gross)", "BE (SN)",
            "Net SN @5", "Net SN @10", "Net SN @20", "Net SN @30"]
 rows = []
-for _, r in sum33.sort_values("annualized_spread_sharpe_sn", ascending=False).iterrows():
+for _, r in sum_nd_tc.sort_values("annualized_spread_sharpe_sn", ascending=False).iterrows():
     rows.append([
         ND_LABEL.get(r["model"], r["model"]),
         f"{r['annualized_spread_sharpe']:.2f}",
@@ -323,7 +323,7 @@ save("03_table_tc_nextday.png")
 fig, ax = plt.subplots(figsize=(16, 6))
 fig.suptitle("Overnight + Transaction Costs — All Models  (Script 34)", fontsize=13, fontweight="bold", y=1.01)
 rows = []
-for _, r in sum34.sort_values("annualized_spread_sharpe_sn", ascending=False).iterrows():
+for _, r in sum_on_tc.sort_values("annualized_spread_sharpe_sn", ascending=False).iterrows():
     rows.append([
         ON_LABEL.get(r["model"], r["model"]),
         f"{r['annualized_spread_sharpe']:.2f}",
@@ -349,7 +349,7 @@ cross_cols = ["Strategy", "Model", "HL", "Gross Sharpe", "SN Sharpe", "IC",
               "τ SN (daily)", "Ann τ SN", "BE SN (bps)", "Net SN @5bps", "Net SN @10bps"]
 rows = []
 # best 5 next-day by SN Sharpe
-for _, r in sum33.sort_values("annualized_spread_sharpe_sn", ascending=False).head(5).iterrows():
+for _, r in sum_nd_tc.sort_values("annualized_spread_sharpe_sn", ascending=False).head(5).iterrows():
     rows.append([
         "Next-Day",
         ND_LABEL.get(r["model"], r["model"]),
@@ -364,7 +364,7 @@ for _, r in sum33.sort_values("annualized_spread_sharpe_sn", ascending=False).he
         f"{r['net_sharpe_sn_10bps']:.2f}",
     ])
 # best 5 overnight by SN Sharpe
-for _, r in sum34.sort_values("annualized_spread_sharpe_sn", ascending=False).head(5).iterrows():
+for _, r in sum_on_tc.sort_values("annualized_spread_sharpe_sn", ascending=False).head(5).iterrows():
     rows.append([
         "Overnight",
         ON_LABEL.get(r["model"], r["model"]),
@@ -532,7 +532,7 @@ fig.suptitle("Half-Life Sensitivity: Annualised Sharpe vs OFI Decay Half-Life", 
 
 ax = axes[0]
 ax.set_title("Next-Day Strategy")
-hls, gross, sn = hl_rows(sum27, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral")
+hls, gross, sn = hl_rows(sum_nd, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral")
 ax.plot(hls, gross, "o--", color=BLUE[0], label="Gross", linewidth=1.8, markersize=7)
 ax.plot(hls, sn,    "s-",  color=BLUE[2], label="Sector-Neutral", linewidth=1.8, markersize=7)
 ax.axhline(0, color="k", linewidth=0.7, linestyle="--")
@@ -543,7 +543,7 @@ ax.legend()
 
 ax = axes[1]
 ax.set_title("Overnight Strategy")
-hls, gross, sn = hl_rows(sum31, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral")
+hls, gross, sn = hl_rows(sum_on, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral")
 ax.plot(hls, gross, "o--", color=GREEN[0], label="Gross", linewidth=1.8, markersize=7)
 ax.plot(hls, sn,    "s-",  color=GREEN[2], label="Sector-Neutral", linewidth=1.8, markersize=7)
 ax.axhline(0, color="k", linewidth=0.7, linestyle="--")
@@ -562,8 +562,8 @@ fig, axes = plt.subplots(1, 2, figsize=(16, 5.5))
 fig.suptitle("Annualised Sharpe — All Models  (left: gross, right: sector-neutral)", fontsize=13, fontweight="bold")
 
 for ax, df, lmap, col_g, col_sn, palette, title in [
-    (axes[0], sum27, ND_LABEL, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral", BLUE, "Next-Day"),
-    (axes[1], sum31, ON_LABEL, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral", GREEN, "Overnight"),
+    (axes[0], sum_nd, ND_LABEL, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral", BLUE, "Next-Day"),
+    (axes[1], sum_on, ON_LABEL, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral", GREEN, "Overnight"),
 ]:
     df2 = df.sort_values(col_sn, ascending=True).copy()
     labels = [lmap.get(m, m) for m in df2["model"]]
@@ -587,8 +587,8 @@ fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 fig.suptitle("Mean Daily IC (Spearman) — All Models", fontsize=13, fontweight="bold")
 
 for ax, df, lmap, palette, title in [
-    (axes[0], sum27, ND_LABEL, BLUE,  "Next-Day"),
-    (axes[1], sum31, ON_LABEL, GREEN, "Overnight"),
+    (axes[0], sum_nd, ND_LABEL, BLUE,  "Next-Day"),
+    (axes[1], sum_on, ON_LABEL, GREEN, "Overnight"),
 ]:
     df2 = df.sort_values("mean_daily_ic", ascending=True).copy()
     labels = [lmap.get(m, m) for m in df2["model"]]
@@ -635,8 +635,8 @@ fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
 fig.suptitle("Breakeven Round-Trip Cost (bps)  —  Gross & Sector-Neutral", fontsize=13, fontweight="bold")
 
 for ax, df, lmap, palette, title in [
-    (axes[0], sum33, ND_LABEL, BLUE,  "Next-Day"),
-    (axes[1], sum34, ON_LABEL, GREEN, "Overnight"),
+    (axes[0], sum_nd_tc, ND_LABEL, BLUE,  "Next-Day"),
+    (axes[1], sum_on_tc, ON_LABEL, GREEN, "Overnight"),
 ]:
     df2 = df.sort_values("breakeven_rt_bps_sn", ascending=True).copy()
     labels = [lmap.get(m, m) for m in df2["model"]]
@@ -659,15 +659,15 @@ save("15_tc_breakeven_bars.png")
 # ============================================================
 # Figure 16 — Net SN Sharpe at TC scenarios: top models
 # ============================================================
-top_nd_models = sum33.sort_values("annualized_spread_sharpe_sn", ascending=False).head(6)["model"].tolist()
-top_on_models = sum34.sort_values("annualized_spread_sharpe_sn", ascending=False).head(6)["model"].tolist()
+top_nd_models = sum_nd_tc.sort_values("annualized_spread_sharpe_sn", ascending=False).head(6)["model"].tolist()
+top_on_models = sum_on_tc.sort_values("annualized_spread_sharpe_sn", ascending=False).head(6)["model"].tolist()
 
 fig, axes = plt.subplots(1, 2, figsize=(15, 5.5))
 fig.suptitle("Net Sector-Neutral Sharpe at TC Scenarios  (top 6 models per strategy)", fontsize=13, fontweight="bold")
 
 for ax, df, models, lmap, palette, title in [
-    (axes[0], sum33, top_nd_models, ND_LABEL, BLUE,  "Next-Day"),
-    (axes[1], sum34, top_on_models, ON_LABEL, GREEN, "Overnight"),
+    (axes[0], sum_nd_tc, top_nd_models, ND_LABEL, BLUE,  "Next-Day"),
+    (axes[1], sum_on_tc, top_on_models, ON_LABEL, GREEN, "Overnight"),
 ]:
     sharpe_cols = {
         0:  "annualized_spread_sharpe_sn",
@@ -706,8 +706,8 @@ fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 fig.suptitle("Cumulative Net P&L at Transaction Cost Scenarios  (sector-neutral weights)", fontsize=13, fontweight="bold")
 
 for ax, model, tc_dir, spread_dict, ret_df, lmap, title in [
-    (axes[0], best_tc_nd, DIR_33, spread_nd, ret_nd, ND_LABEL, "Next-Day"),
-    (axes[1], best_tc_on, DIR_34, spread_on, ret_on, ON_LABEL, "Overnight"),
+    (axes[0], best_tc_nd, DIR_09, spread_nd, ret_nd, ND_LABEL, "Next-Day"),
+    (axes[1], best_tc_on, DIR_10, spread_on, ret_on, ON_LABEL, "Overnight"),
 ]:
     if model not in spread_dict:
         ax.text(0.5, 0.5, "data not available", ha="center", va="center", transform=ax.transAxes)
@@ -739,8 +739,8 @@ fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
 fig.suptitle("Daily Sector-Neutral Turnover Distribution  (best models)", fontsize=13, fontweight="bold")
 
 for ax, model, tc_dir, palette, title in [
-    (axes[0], best_tc_nd, DIR_33, BLUE,  "Next-Day"),
-    (axes[1], best_tc_on, DIR_34, GREEN, "Overnight"),
+    (axes[0], best_tc_nd, DIR_09, BLUE,  "Next-Day"),
+    (axes[1], best_tc_on, DIR_10, GREEN, "Overnight"),
 ]:
     tau_df = load_turnover(tc_dir, model)
     if tau_df.empty:
@@ -768,8 +768,8 @@ matrix = np.full((len(hl_sweep), 4), np.nan)
 
 for i, hl in enumerate(hl_sweep):
     for df, col_g, col_sn, j_g, j_sn in [
-        (sum27, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral", 0, 1),
-        (sum31, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral", 2, 3),
+        (sum_nd, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral", 0, 1),
+        (sum_on, "annualized_spread_sharpe", "annualized_spread_sharpe_sector_neutral", 2, 3),
     ]:
         mask = (df["half_life_minutes"] == hl) & (~df["sig_cols"].astype(str).str.contains(r"\|"))
         mask &= ~df["sig_cols"].astype(str).str.contains("_rn")
@@ -825,8 +825,8 @@ save("20_rolling_ic_comparison.png")
 fig, ax = plt.subplots(figsize=(9, 6))
 ax.set_title("Mean IC vs Annualised SN Sharpe  (all models, both strategies)", fontsize=13)
 for df, lmap, col, marker, palette, label in [
-    (sum27, ND_LABEL, "annualized_spread_sharpe_sector_neutral", "o", BLUE,  "Next-Day"),
-    (sum31, ON_LABEL, "annualized_spread_sharpe_sector_neutral", "s", GREEN, "Overnight"),
+    (sum_nd, ND_LABEL, "annualized_spread_sharpe_sector_neutral", "o", BLUE,  "Next-Day"),
+    (sum_on, ON_LABEL, "annualized_spread_sharpe_sector_neutral", "s", GREEN, "Overnight"),
 ]:
     ax.scatter(df["mean_daily_ic"] * 100, df[col], s=60, c=palette[0],
                marker=marker, alpha=0.8, label=label)
@@ -850,8 +850,8 @@ fig, axes = plt.subplots(1, 2, figsize=(13, 4.5))
 fig.suptitle("Chosen Ridge λ Over Time  (walk-forward refit blocks, best models)", fontsize=13, fontweight="bold")
 
 for ax, result_dir, model, lmap, palette, title in [
-    (axes[0], DIR_27, best_nd, ND_LABEL, BLUE,  "Next-Day"),
-    (axes[1], DIR_31, best_on, ON_LABEL, GREEN, "Overnight"),
+    (axes[0], DIR_06, best_nd, ND_LABEL, BLUE,  "Next-Day"),
+    (axes[1], DIR_07, best_on, ON_LABEL, GREEN, "Overnight"),
 ]:
     p = result_dir / f"rolling_lambda_history_{model}.csv"
     if not p.exists():

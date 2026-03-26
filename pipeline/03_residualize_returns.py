@@ -4,7 +4,7 @@ from pathlib import Path
 
 WINDOW     = 60
 INPUT      = Path("data/processed/feature_table.csv")
-OUTPUT     = Path("data/processed/feature_table_with_residuals.csv")
+OUTPUT     = Path("data/processed/feature_table_with_residuals_10level.csv")
 CHUNK_SIZE = 50_000
 TMP_RESID  = Path("data/processed/_residuals_tmp.csv")
 

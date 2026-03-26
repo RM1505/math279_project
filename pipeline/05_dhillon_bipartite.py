@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """05_dhillon_bipartite.py
 
-Dhillon bipartite spectral co-clustering adapted to match the data pipeline
-and configuration of scripts 27 / 33 / 37.
+Dhillon bipartite spectral co-clustering applied to the same exp-decay OFI
+feature table as scripts 04 (DST) and 06 (ridge).
 
-Compared to script 29:
-  - GOOGL filtered out (same as 27/33/37)
+Configuration matches the ridge pipeline (script 06):
+  - GOOGL duplicate filtered out
   - MIN_SECTOR_ASSETS=4 gate on within-sector masking
-  - Half-life sweep [15,20,25,30,35,40,45,60,90] — identical to script 27
-  - Both plain rank-norm (_rn, same as 27) and signed rank-norm (_srn = rank_pct-0.5)
-  - Stripped to core configs only (no training-window sweep, no k=3/4 variants)
-  - Results comparable to DST (script 37) and ridge (script 27)
+  - Half-life sweep [15,20,25,30,35,40,45,60,90] — identical to scripts 04/06
+  - Plain rank-norm (_rn) variants alongside raw OFI
+  - Core configs only (k=2 clusters, with and without within-sector masking)
 
 Method
 ------
@@ -22,7 +21,7 @@ is treated as a bipartite graph.  Dhillon (2001) co-clustering:
   4. Select the source-cluster → target-cluster block maximising mean edge score
 
 Daily prediction: score_i = Σ_{j in S} w_j * P_{t-1,j}  (weighted average of
-source OFI), scaled by target loadings.  Evaluated identically to scripts 27/37.
+source OFI), scaled by target loadings.  Evaluated identically to scripts 04/06.
 
 Outputs → results/dhillon_adapted/
 
@@ -62,7 +61,7 @@ RANDOM_STATE     = 0
 
 TRAIN_DAYS    = 750
 RECLUSTER     = 21
-MIN_COUNT     = 125         # ~TRAIN_DAYS/6; same logic as script 29
+MIN_COUNT     = 125         # ~TRAIN_DAYS/6
 FDR_Q         = 0.10
 COST_BPS      = 5.0
 
@@ -75,7 +74,7 @@ for hl in HALF_LIFE_SWEEP:
         "sig":  f"ofi_hl{hl}",
         "k": 2, "ws": False,
     })
-    # rank-norm OFI  (plain pct-rank, same as script 27)
+    # rank-norm OFI  (plain pct-rank, same as script 06)
     SWEEP_CONFIGS.append({
         "name": f"dh_hl{hl}_rn_k2",
         "sig":  f"ofi_hl{hl}_rn",
@@ -105,7 +104,7 @@ def build_exp_decay_kernel(n_minutes: int, half_life: float) -> np.ndarray:
 
 
 # ============================================================
-# edge statistics  (from script 29)
+# edge statistics
 # ============================================================
 @dataclass
 class EdgeStats:
@@ -182,7 +181,7 @@ def compute_edge_stats(
 
 
 # ============================================================
-# Dhillon co-clustering  (from script 29)
+# Dhillon co-clustering
 # ============================================================
 @dataclass
 class CoClusterResult:
@@ -235,7 +234,7 @@ def dhillon_coclustering(W: np.ndarray, n_clusters: int,
 
 
 # ============================================================
-# block selection  (from script 29)
+# block selection
 # ============================================================
 @dataclass
 class BlockSelection:
@@ -327,7 +326,7 @@ def choose_block_with_fallbacks(est: EdgeStats, n_clusters: int,
 
 
 # ============================================================
-# daily position construction  (from script 29)
+# daily position construction
 # ============================================================
 def make_daily_positions(sig_today: np.ndarray, n_assets: int,
                           block: BlockSelection) -> np.ndarray:
@@ -489,7 +488,7 @@ def run_walkforward(
 
 
 # ============================================================
-# data loading  (mirrors script 27 / 37)
+# data loading
 # ============================================================
 print("Reading data...", flush=True)
 header   = pd.read_csv(INPUT_PATH, nrows=0)

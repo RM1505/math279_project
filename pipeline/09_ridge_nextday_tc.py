@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """09_ridge_nextday_tc.py
 
-Transaction-cost-aware version of the rolling ridge strategy from script 27.
+Transaction-cost-aware version of the rolling ridge strategy from script 06.
 
 FRAMEWORK
 ---------
@@ -103,7 +103,7 @@ RIDGE_GRID         = [1.0, 10.0, 50.0, 250.0, 1000.0]
 # A 10 bps round-trip means 5 bps one-way, i.e. bid-ask spread ≈ 10 bps.
 TC_SCENARIOS_BPS = [5, 10, 20, 30]
 
-# We focus on the best-performing model variants from script 27 plus the
+# We focus on the best-performing model variants from script 06 plus the
 # baseline, to keep runtime manageable.
 MODEL_SPECS = [
     {"name": "ridge_sb",             "structure": "sector_block", "use_gd": False,
