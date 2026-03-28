@@ -1,0 +1,1 @@
+This archives folder holds various scripts that were used to explore various methodologies for this project. The final pipeline used in the resulting paper is found in the ```pipeline``` folder.
