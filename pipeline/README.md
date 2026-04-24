@@ -83,6 +83,8 @@ refit every 21 days. The exp-decay OFI signal uses half-lives
 | `10_ridge_overnight_tc.py` | Ridge + sector-block + GD + TC | overnight | `results/rolling_adjacency_ridge_overnight_tc/` |
 | `11_plot_ridge_results.py` | — | — | `results/figures/` |
 | `12_plot_dst_dhillon_results.py` | — | — | `results/figures_dst_dhillon/` |
+| `13_ensemble.py` | Equal-weight + IC-weighted ensemble | next-day + overnight | `results/ensemble/` |
+| `14_spectral_sector.py` | Spectral clustering block discovery | next-day residual | `results/spectral_sector/` |
 
 **Key modeling choices (scripts 06–10):**
 
@@ -112,18 +114,22 @@ sector only) is used to keep the multiple-testing burden manageable.
 
 ```bash
 # ── data pipeline (skip if you have feature_table_with_residuals_10level.csv) ──
-python pipeline/01_lobster_to_integrated_ofi.py
+python pipeline/01_lobster_to_integrated_ofi.py   # rolling PCA option via ROLLING_PCA_WINDOW_DAYS
 python pipeline/02_build_feature_matrix.py
-python pipeline/03_residualize_returns.py
+python pipeline/03_residualize_returns.py         # now uses 3-PC rolling PCA (matches paper)
 
 # ── analysis (can run independently once feature table exists) ──────────────
 python pipeline/04_directed_source_target.py     # ~10 min
 python pipeline/05_dhillon_bipartite.py          # ~20 min
-python pipeline/06_ridge_nextday.py              # ~2 hr
+python pipeline/06_ridge_nextday.py              # ~3 hr  (+ nuclear norm, soft sector, holdout CV)
 python pipeline/07_ridge_overnight.py            # ~2 hr
 python pipeline/08_ridge_close_to_close.py       # ~2 hr
-python pipeline/09_ridge_nextday_tc.py           # ~3 hr
+python pipeline/09_ridge_nextday_tc.py           # ~4 hr  (+ EMA smoothing sweep)
 python pipeline/10_ridge_overnight_tc.py         # ~3 hr
+
+# ── new analysis scripts ─────────────────────────────────────────────────────
+python pipeline/13_ensemble.py                   # ~5 min  (requires 06 + 07 outputs)
+python pipeline/14_spectral_sector.py            # ~2 hr   (data-driven sector discovery)
 
 # ── figures ──────────────────────────────────────────────────────────────────
 python pipeline/11_plot_ridge_results.py         # requires 06,07,09,10 outputs
