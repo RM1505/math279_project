@@ -1,0 +1,14 @@
+{
+  "scores": {
+    "stocks": 483,
+    "aggregate_rows": 9174768,
+    "fitted_specifications": 6426,
+    "checks_passed": true
+  },
+  "scores_session_control": {
+    "stocks": 483,
+    "aggregate_rows": 3058232,
+    "fitted_specifications": 2142,
+    "checks_passed": true
+  }
+}

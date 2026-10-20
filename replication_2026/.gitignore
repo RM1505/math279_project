@@ -1,0 +1,5 @@
+__pycache__/
+outputs/
+*.csv
+*.csv.gz
+full_study/

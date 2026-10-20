@@ -1,0 +1,37 @@
+{
+  "scope": "2017\u20132019 full available minute-snapshot panel",
+  "python": "3.13.12",
+  "numpy": "2.4.4",
+  "pandas": "3.0.2",
+  "scipy": "1.17.1",
+  "py7zr": "1.1.0",
+  "sources": {
+    "study.py": "a1f5651e242e5674bc8e19d4369148fd28ea39faecac36b5f2198b0a4632b10c",
+    "summarize_study.py": "a68f56a317fa23b63a5c5cc2cb633661e177cdb3c8a8af444682b69d113580a9",
+    "PROTOCOL.md": "08014f2b9a0ec356997b7cbf31ef5882981f553b0db8dd25a26b469ec0daa935"
+  },
+  "pre_evaluation_sources": {
+    "study.py": "cfff2b527b27418f6f796bd979bb0b44540522e8785313790cc03ed51202227a",
+    "summarize_study.py": "d2b320a3d1ccf19dfa88b52b178f17d88d9f8e9f5f2e1c48b4fb33d5436f429d",
+    "PROTOCOL.md": "2366eef943b57b1ed572c3055450702525054359f5b558955751d423b58bdc4c"
+  },
+  "final_sources": {
+    "pilot.py": "dd5b6b9eda2196519aec48eeca5258e8d4273721769065f10d88095d52817b05",
+    "test_statistics.py": "d113990ba7fe25af7cb931300cbf9b595b83ba81a5f5ff972ee1ba32fac51f67",
+    "test_event_ingest.py": "f98b2174c4b9e3adeb4790661baa6a2c7397f1d3d2c2ad426e3e437e46d2ed24",
+    "report_study.py": "5d4fc783578990e45c8c9488c04c7ce1191f7a1c355399892fd8d687e13bebe5",
+    "test_study.py": "eb1b7ab62a340614f8b4d7c36d600c769c2bcfa5c7f8fb27accfc5e98cfaf427",
+    "test_pilot.py": "657f0522b78d4e1da21f838b99c56baa050bd5fa11c01bb1879bb100473571ac",
+    "audit_results.py": "cdee61d3c5887b08308dd637e46c5fbde73e19cd49f2cf9adfe429ddf3f96a38",
+    "verify_saved_models.py": "5b27aa087a52608c721aafb9550b880f0856de76a1d72195955cd1fd804d259c",
+    "summarize_study.py": "b0001dc4b6d55485e0433c971cea8c2b6f34f0a2f7a36c52a3564bbf6ba25297",
+    "summarize_session_control.py": "fb9b1d4891781ed39e82c604efc8df554f1b4affcd1eb8ae65cd2568eb2553f2",
+    "inference_sensitivity.py": "d580e3a67dd80da6b6246f5e6bd118a1ebc3953a9cb74e2f353b2913c61f7bd5",
+    "session_control.py": "05f671e3fa922329cff9e0b5fb2921d225956198c55fde2ada4561d3a8617048",
+    "study.py": "cfff2b527b27418f6f796bd979bb0b44540522e8785313790cc03ed51202227a",
+    "event_ingest.py": "2ee2c359948426aac8a1fefdfcb974d170716f570f382af457df6bbd3a23619c"
+  },
+  "scored_stocks": 483,
+  "scored_deep_stocks": 105,
+  "primary_rows": 42655513
+}
