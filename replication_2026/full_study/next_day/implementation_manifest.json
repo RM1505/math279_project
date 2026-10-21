@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-21",
+  "python": "3.13.12",
+  "numpy": "2.4.4",
+  "pandas": "3.0.2",
+  "scipy": "1.17.1",
+  "sklearn": "1.8.0",
+  "source_sha256": {
+    "daily_data.py": "1c43b0377903352ccc1bf0cd1569dbda99f9bbc27925f3e1e78e9afd44c78b7b",
+    "next_day_study.py": "a068467c82e83cb1f70e7fa2583e510d6eb5a54c504d274a9af5e492430a54c3",
+    "summarize_next_day.py": "d8b86f148bd3b81f81e803fd57158f881994be776221ee15f4e2b35edde3a5c4",
+    "depth_next_day.py": "db0dc023cd40ab3a68fa566fb5ce22f4f4c22c0562b74f2cd97113769ddabda5",
+    "verify_next_day.py": "0e48ba9c0c3814d7f908a3eb7086651d0dec507b8b97319411339e7910265c30",
+    "report_next_day.py": "892da4271e3d0121f48e7384f692eb9d9d8d72f56a89538ea007a04d56122fc5",
+    "test_next_day.py": "8b7b5d3af6c5a785eebb661a83cbae26abdff5da6e04d27f37b0d93213f78855",
+    "NEXT_DAY_PROTOCOL.md": "b80e4c58dd87d86c8a8c5ba98d56ea7e6ad789aaa7618b61a4a68436a06e7357"
+  },
+  "models_with_convergence_warnings": [
+    "combined_neural_base",
+    "combined_neural_book",
+    "intraday_neural_base",
+    "intraday_neural_book",
+    "overnight_neural_base",
+    "overnight_neural_book"
+  ],
+  "model_count": 42,
+  "replayed_predictions": 4074,
+  "max_replay_error": 2.220446049250313e-16
+}

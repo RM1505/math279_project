@@ -1,0 +1,13 @@
+# Follow-up ranking experiment — 20 October 2026
+
+Exploratory follow-up after inspecting the primary 2019 results. No novelty or untouched-holdout claim. Fix this specification before inspecting ranking outcomes.
+
+At each minute from 10:00 through 15:58, rank the available stocks using information available at that minute. Rigel's main proposed rule takes the 20 largest absolute one-minute forecasts, buying positive and shorting negative forecasts, equal notional weights. Top 5 and 50 are sensitivity checks. Compare return-history and cross-book models. Add one interpretable extension: cross-book features plus spread × queue imbalance / 2 (the relative displacement of the queue-weighted midpoint). This is not the fitted Stoikov microprice and is not a novel feature.
+
+Cost-aware variants rank by absolute forecast minus the current full spread estimate; admit a stock only when absolute forecast exceeds 1 or 2 current spreads. No future spread or return enters ranking. Position count is capped at K; unused slots stay cash with weights 1/K, never scaled up when few names qualify. Zero signal means no trade.
+
+Fit 2017, tune model penalties and select the rule on 2018, refit coefficients on 2017–2018, score 2019. Original models use their existing saved penalties and 2019 fitted parameters. Both alpha and rule selection reuse 2018 as validation, which is acceptable for tuning but is not independent evidence. Select among the fixed rules by mean daily spread-net profit under turnover-aware accounting; include cash as a candidate. Report every candidate, explicitly distinguish the validation-selected result from hindsight winners. Do not change thresholds after looking at 2019.
+
+Report both independent bid/ask round trips and a constant-notional portfolio that trades only changes in target holdings, allowing positions to persist between adjacent minutes. The latter accounts for the drift in existing dollar exposures and charges spread on changes, then liquidates before 16:00. It assumes observed quote fills and excludes fees, impact, borrow, financing and capacity. It is not evidence of achievable execution. Report core/closing periods, turnover, active positions and day-block uncertainty. Score missing selected future outcomes as unscorable, never as zero or an excuse to select a different stock. Log exclusions.
+
+Sources motivating these checks: Cont–Cucuringu–Zhang, https://arxiv.org/html/2112.13213 (spread-filtered forecasts); Stoikov, https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2970694 (distinguishes weighted midpoint from fitted microprice). Passive fills cannot be inferred from minute snapshots and will not be fabricated.
