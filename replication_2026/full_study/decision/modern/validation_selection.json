@@ -1,0 +1,16 @@
+[
+  {
+    "target": "combined",
+    "family": "ridge",
+    "rule": "liquid_top20",
+    "validation_net_bps": 6.189836049685581,
+    "best_risky_validation_net_bps": 6.189836049685581
+  },
+  {
+    "target": "intraday",
+    "family": "cash",
+    "rule": "cash",
+    "validation_net_bps": 0,
+    "best_risky_validation_net_bps": -2.7952109940971654
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-21",
+  "python": "3.13.12",
+  "models": 50,
+  "replayed": 3050,
+  "historical_stocks": 438,
+  "historical_archived_stock_days": 659900,
+  "source_sha256": {
+    "DECISION_PROTOCOL.md": "91ba34eabbeb40d70ede074b89efa20828b3558f5ca03b1efe576f44a1877723",
+    "historical_daily.py": "4c137ad4276ddd827a504efc99e32442da94faf12a2ef5204cf89463d5debdad",
+    "decision_models.py": "d48c986f2ea30e3030e59675ebb4628245675e75bf3760d48b6aad121e589873",
+    "decision_audit.py": "26f4340b8879ffdb59cff71e196792a180aec2880300564cefe74dd2f174cfbc",
+    "closing_match.py": "db1b3f9d6f9e028c4d648d50fdd3e58fb22685af4a1166e6937ebd220957c153",
+    "historical_attribution.py": "74c9b2224d43783530d66c76bc7c7c7d5320536dc6539bc039c59e4f9629ae5b",
+    "test_decision.py": "093f6bfd7e9b1e608f903d62a2dcd08997f0cedd6e412a0c6d158c63739aec96",
+    "verify_decision.py": "80db8e792d0c334b78e68d15eaeaf90bee37d0f8579232701167146689533a77",
+    "report_decision.py": "bc54c2ad957519800cd4030ee359cad88137f40cbfd4948da4fd06970fd58107"
+  }
+}

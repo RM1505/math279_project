@@ -1,6 +1,6 @@
 # Shared research branch
 
-Published to `RM1505/math279_project` at Brendan's request. Start with [NEXT_DAY_REPORT.md](NEXT_DAY_REPORT.md), then [RANKING_REPORT.md](RANKING_REPORT.md). The original [REPORT.md](REPORT.md) covers the completed minute-snapshot reconstruction; its statements about no external publication refer to the earlier local run.
+Published to `RM1505/math279_project` at Brendan's request. Start with [DECISION_REPORT.md](DECISION_REPORT.md). It adds the decision-stage checks and separate 2011–2016 experiment. The earlier [NEXT_DAY_REPORT.md](NEXT_DAY_REPORT.md) and [RANKING_REPORT.md](RANKING_REPORT.md) remain available. The original [REPORT.md](REPORT.md) covers the completed minute-snapshot reconstruction; its statements about no external publication refer to the earlier local run.
 
 The branch includes source, tests, compact aggregate tables and figures. Raw books, inventories, minute caches, daily panels, fitted model objects and individual predictions remain local. Report references to these local provenance files do not mean they are bundled in this public repository.
 

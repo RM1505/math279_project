@@ -1,0 +1,16 @@
+[
+  {
+    "target": "combined",
+    "family": "additive",
+    "rule": "top20",
+    "validation_net_bps": 4.162776726956185,
+    "best_risky_validation_net_bps": 4.162776726956185
+  },
+  {
+    "target": "intraday",
+    "family": "cash",
+    "rule": "cash",
+    "validation_net_bps": 0,
+    "best_risky_validation_net_bps": -9.55503428410681
+  }
+]

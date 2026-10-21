@@ -1,0 +1,6 @@
+{
+  "market_component_bps": 16.5531401785483,
+  "constant_average_exposure_bps": 2.9947422179092658,
+  "dynamic_covariance_component_bps": 13.558397960639034,
+  "interpretation": "Ex-post decomposition; sample-average exposure is not a validation-fixed strategy."
+}
