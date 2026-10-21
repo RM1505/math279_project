@@ -1,6 +1,8 @@
-# OFI reconstruction: next-day forecasts, ranking and minute snapshots
+# OFI research: snapshot measurement, forecasts and replication
 
-**Latest:** [Decision memo for the Mihai discussion](DECISION_REPORT.md) covers the earlier-period replication, exposure and concentration checks, relative-return/liquidity extensions, risk forecasts, and matched closing-session analysis. The recommendation is to stop the broad daily snapshot-alpha search and discuss the negative reconstruction honestly.
+**Latest:** [Snapshot measurement research note](RESOLUTION_REPORT.md) tests when endpoint OFI disagrees with summed minute increments. It includes an exact aggregation-error identity, fixed-queue price-input controls, a 483-stock resolution audit and an aggregation-preserving utility. This is a concrete methods-paper candidate; novelty and publishability remain unconfirmed. See also [theory](RESOLUTION_THEORY.md), [protocol](RESOLUTION_PROTOCOL.md) and [closest prior work](RESOLUTION_LITERATURE.md).
+
+**Earlier decision study:** [Decision memo for the Mihai discussion](DECISION_REPORT.md) covers the earlier-period replication, exposure and concentration checks, relative-return/liquidity extensions, risk forecasts, and matched closing-session analysis. The recommendation is to stop the broad daily snapshot-alpha search and discuss the negative reconstruction honestly.
 
 The next-day follow-up is complete: start with [NEXT_DAY_REPORT.md](NEXT_DAY_REPORT.md). It restores the original daily horizon, compares seven model families with matched price-history baselines, and tests top-20 and long-10/short-10 rankings. No positive primary book increment is established; all tested next-session ranking variants have negative average returns after spreads. [RANKING_REPORT.md](RANKING_REPORT.md) separately answers the minute-horizon ranking suggestion. [NOVELTY_REVIEW.md](NOVELTY_REVIEW.md) explains the substantial overlap with prior work.
 

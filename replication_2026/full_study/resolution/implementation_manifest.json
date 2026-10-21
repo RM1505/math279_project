@@ -1,0 +1,20 @@
+{
+  "python": "3.13.12",
+  "numpy": "2.4.4",
+  "pandas": "3.0.2",
+  "stocks": 483,
+  "hashes": {
+    "resolution_study.py": "7572bfd39e8b6be8b74b9a9e9c521877e068133f895d529a3ddc4ae3586d98ad",
+    "resolution_transform.py": "31788bd68dc025b7d11802705563a73e60ef4d7c57f60410c364e10e61cffda4",
+    "resolution_tools.py": "966222ba965bd29aa132e1bff758033d8b7c24a97e9f199afbe60a559e8f0d52",
+    "resolution_null.py": "5be1a7b8530cf1f3f8d01bf2770f477c9eed3571cf7f12b4a3b43ce3d62c949e",
+    "resolution_sensitivity.py": "beb0e62971ff20c300d36353b83f0d713882558718896ee5962106bcf5a9138a",
+    "resolution_heterogeneity.py": "4fa81fced948354b69ce80fd52f73e61747abb8e832fcd9a89cc096884a63af2",
+    "summarize_resolution.py": "ee7dda2deb0abd3651291fbbbef9d6bd0d3b3b519e558da8680889cc84b4c673",
+    "verify_resolution.py": "62464e6b57d629d603b3a34d152003d9498961f16e378f8860cacf0c2f97c799",
+    "replay_resolution.py": "0a1c94003246fc837e08fb37bf8931f38f60ad2427f9feb97c42a97109317f82",
+    "report_resolution.py": "9aecce6cdfb2011715000c4e9e02205561de20d2c5a18227687efc2eabf297ef",
+    "test_resolution.py": "a5a2d8cb5ff5412c333f5ea92b5a5e69878418cd4716fd077339ef8424710b00",
+    "RESOLUTION_PROTOCOL.md": "f2949fde7349a2fa0e6ce4d96b866a026035ae37cb8e4686cc98291fa4b48706"
+  }
+}
