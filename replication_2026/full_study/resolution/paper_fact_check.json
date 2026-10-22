@@ -1,0 +1,121 @@
+{
+  "status": "passed",
+  "claims": [
+    {
+      "claim": "five-minute 2019",
+      "value": 0.1703198059904911,
+      "paper": "17.03%"
+    },
+    {
+      "claim": "thirty-minute 2019",
+      "value": 0.2161133558043117,
+      "paper": "21.61%"
+    },
+    {
+      "claim": "five-minute 2017",
+      "value": 0.1597655490005084,
+      "paper": "15.98%"
+    },
+    {
+      "claim": "five-minute 2018",
+      "value": 0.1708259896992209,
+      "paper": "17.08%"
+    },
+    {
+      "claim": "phase shift",
+      "value": 0.1726572991130958,
+      "paper": "17.27%"
+    },
+    {
+      "claim": "threshold 0.001",
+      "value": 0.1790694730912967,
+      "paper": "17.91%"
+    },
+    {
+      "claim": "same_fine",
+      "value": 0.2338164718769276,
+      "paper": "23.38%"
+    },
+    {
+      "claim": "same_coarse",
+      "value": 0.2425266689714233,
+      "paper": "24.25%"
+    },
+    {
+      "claim": "same_frozen",
+      "value": 0.5432186590123749,
+      "paper": "54.32%"
+    },
+    {
+      "claim": "tanh_coarse",
+      "value": 0.4988053154235791,
+      "paper": "49.88%"
+    },
+    {
+      "claim": "sign_return",
+      "value": 0.5249428438385498,
+      "paper": "52.49%"
+    },
+    {
+      "claim": "next_fine vs next_base",
+      "value": -4.5724776051880416e-05,
+      "paper": "0.0046%"
+    },
+    {
+      "claim": "next_coarse vs next_base",
+      "value": -3.6342382429998536e-05,
+      "paper": "0.0036%"
+    },
+    {
+      "claim": "stocks",
+      "value": 483,
+      "paper": "483"
+    },
+    {
+      "claim": "windows_primary",
+      "value": 25475162,
+      "paper": "25,475,162"
+    },
+    {
+      "claim": "stock_days_primary",
+      "value": 358807,
+      "paper": "358,807"
+    },
+    {
+      "claim": "excluded_primary",
+      "value": 135,
+      "paper": "135"
+    },
+    {
+      "claim": "opposite",
+      "value": 1377269,
+      "paper": "1,377,269"
+    },
+    {
+      "claim": "both_material",
+      "value": 8091184,
+      "paper": "8,091,184"
+    },
+    {
+      "claim": "material retention",
+      "value": 0.9591193988185236,
+      "paper": "95.91%"
+    },
+    {
+      "claim": "long null disagreement",
+      "value": 0.2052,
+      "paper": "20.52%"
+    },
+    {
+      "claim": "replayed models",
+      "value": 210,
+      "paper": "210"
+    },
+    {
+      "claim": "replayed daily losses",
+      "value": 7560,
+      "paper": "7,560"
+    }
+  ],
+  "raw_files": 18
+}

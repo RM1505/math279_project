@@ -1,6 +1,8 @@
 # OFI research: snapshot measurement, forecasts and replication
 
-**Latest:** [Snapshot measurement research note](RESOLUTION_REPORT.md) tests when endpoint OFI disagrees with summed minute increments. It includes an exact aggregation-error identity, fixed-queue price-input controls, a 483-stock resolution audit and an aggregation-preserving utility. This is a concrete methods-paper candidate; novelty and publishability remain unconfirmed. See also [theory](RESOLUTION_THEORY.md), [protocol](RESOLUTION_PROTOCOL.md) and [closest prior work](RESOLUTION_LITERATURE.md).
+**Short paper:** [Read the four-page paper](SNAPSHOT_OFI_PAPER.md) or [download the editable version](SNAPSHOT_OFI_PAPER.docx). The paper develops the measurement result, checks its interpretation and states the limits.
+
+**Supporting study:** [Snapshot measurement research note](RESOLUTION_REPORT.md) tests when endpoint OFI disagrees with summed minute increments. It includes an exact aggregation-error identity, fixed-queue price-input controls, a 483-stock resolution audit and an aggregation-preserving utility. This is a concrete methods-paper candidate; novelty and publishability remain unconfirmed. See also [theory](RESOLUTION_THEORY.md), [protocol](RESOLUTION_PROTOCOL.md) and [closest prior work](RESOLUTION_LITERATURE.md).
 
 **Earlier decision study:** [Decision memo for the Mihai discussion](DECISION_REPORT.md) covers the earlier-period replication, exposure and concentration checks, relative-return/liquidity extensions, risk forecasts, and matched closing-session analysis. The recommendation is to stop the broad daily snapshot-alpha search and discuss the negative reconstruction honestly.
 
