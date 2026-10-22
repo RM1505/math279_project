@@ -1,0 +1,41 @@
+{
+  "classification": "post-result descriptive sensitivity; no additional confirmatory p-values",
+  "sign_block_sensitivity": [
+    {
+      "block_days": 10,
+      "estimate": 0.1703198059904911,
+      "low": 0.16867320749903303,
+      "high": 0.172227777184503,
+      "days": 246
+    },
+    {
+      "block_days": 20,
+      "estimate": 0.1703198059904911,
+      "low": 0.16824499087261918,
+      "high": 0.172446773845731,
+      "days": 246
+    },
+    {
+      "block_days": 40,
+      "estimate": 0.1703198059904911,
+      "low": 0.16792052822779932,
+      "high": 0.17259937044327034,
+      "days": 246
+    }
+  ],
+  "frozen_vs_tanh_coarse": {
+    "relative_mse_gain": 0.08861495334159641,
+    "low": 0.08518236002501696,
+    "high": 0.09203707256096431,
+    "stock_days": 118818,
+    "dates": 246,
+    "stocks": 483,
+    "matched_windows": 8436055
+  },
+  "stock_rate_quantiles": {
+    "0.1": 0.13561574698814988,
+    "0.5": 0.1764214883697429,
+    "0.9": 0.19585991432572433
+  },
+  "all_stock_rates_positive": true
+}

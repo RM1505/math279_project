@@ -1,3 +1,7 @@
+# Current manuscript
+
+The expanded **nine-page LaTeX paper** supersedes the short Word draft: [PDF](SNAPSHOT_OFI_PAPER.pdf), [LaTeX source](SNAPSHOT_OFI_PAPER.tex), [Overleaf package](SNAPSHOT_OFI_LATEX.zip), and [submission plan](LATEX_SUBMISSION_README.md). The recommended first conference is Lancaster FINEC 2027 (December 1, 2026 deadline); no paid submission has been made.
+
 # OFI research: snapshot measurement, forecasts and replication
 
 **Short paper:** [Read the four-page paper](SNAPSHOT_OFI_PAPER.md) or [download the editable version](SNAPSHOT_OFI_PAPER.docx). The paper develops the measurement result, checks its interpretation and states the limits.

@@ -1,0 +1,141 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "claim": "scale table h=1",
+      "checked_text": "1&0.00&[0.00, 0.00]"
+    },
+    {
+      "claim": "scale table h=2",
+      "checked_text": "2&11.79&[11.51, 12.09]"
+    },
+    {
+      "claim": "scale table h=5",
+      "checked_text": "5&17.03&[16.82, 17.24]"
+    },
+    {
+      "claim": "scale table h=10",
+      "checked_text": "10&19.49&[19.28, 19.68]"
+    },
+    {
+      "claim": "scale table h=30",
+      "checked_text": "30&21.61&[21.36, 21.87]"
+    },
+    {
+      "claim": "same_fine",
+      "checked_text": "&23.38&[21.23, 25.22]"
+    },
+    {
+      "claim": "same_coarse",
+      "checked_text": "&24.25&[22.19, 25.97]"
+    },
+    {
+      "claim": "same_frozen",
+      "checked_text": "&54.32&[53.28, 55.49]"
+    },
+    {
+      "claim": "sign_coarse",
+      "checked_text": "&48.72&[47.69, 49.88]"
+    },
+    {
+      "claim": "sign_fine",
+      "checked_text": "&32.31&[31.61, 33.12]"
+    },
+    {
+      "claim": "sign_return",
+      "checked_text": "&52.49&[51.46, 53.67]"
+    },
+    {
+      "claim": "tanh_coarse",
+      "checked_text": "&49.88&[48.84, 51.05]"
+    },
+    {
+      "claim": "tanh_fine",
+      "checked_text": "&37.45&[36.66, 38.38]"
+    },
+    {
+      "claim": "paired gain",
+      "checked_text": "8.86\\%"
+    },
+    {
+      "claim": "paired interval",
+      "checked_text": "8.52--9.20\\%"
+    },
+    {
+      "claim": "matched windows",
+      "checked_text": "8,436,055"
+    },
+    {
+      "claim": "bootstrap block 10",
+      "checked_text": "16.87--17.22"
+    },
+    {
+      "claim": "bootstrap block 20",
+      "checked_text": "16.82--17.24"
+    },
+    {
+      "claim": "bootstrap block 40",
+      "checked_text": "16.79--17.26"
+    },
+    {
+      "claim": "stock quantile 0.1",
+      "checked_text": "13.56\\%"
+    },
+    {
+      "claim": "stock quantile 0.5",
+      "checked_text": "17.64\\%"
+    },
+    {
+      "claim": "stock quantile 0.9",
+      "checked_text": "19.59\\%"
+    },
+    {
+      "claim": "next_base",
+      "checked_text": "0.0778\\%"
+    },
+    {
+      "claim": "next_fine",
+      "checked_text": "0.0732\\%"
+    },
+    {
+      "claim": "next_coarse",
+      "checked_text": "0.0742\\%"
+    },
+    {
+      "claim": "next_fine vs next_base",
+      "checked_text": "0.0046\\%"
+    },
+    {
+      "claim": "next_fine vs next_base interval",
+      "checked_text": "[-0.0066,-0.0029]"
+    },
+    {
+      "claim": "next_coarse vs next_base",
+      "checked_text": "0.0036\\%"
+    },
+    {
+      "claim": "next_coarse vs next_base interval",
+      "checked_text": "[-0.0053,-0.0021]"
+    },
+    {
+      "claim": "scope",
+      "checked_text": "Neither is event-level OFI"
+    },
+    {
+      "claim": "scope",
+      "checked_text": "does not make 2019 an untouched research holdout"
+    },
+    {
+      "claim": "scope",
+      "checked_text": "post-result descriptive"
+    },
+    {
+      "claim": "scope",
+      "checked_text": "pending coauthor review"
+    },
+    {
+      "claim": "scope",
+      "checked_text": "0.001 and 0.999"
+    }
+  ]
+}
