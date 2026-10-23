@@ -1,29 +1,30 @@
-# Current manuscript
+# OFI research: current paper and earlier experiments
 
-The expanded **nine-page LaTeX paper** supersedes the short Word draft: [PDF](SNAPSHOT_OFI_PAPER.pdf), [LaTeX source](SNAPSHOT_OFI_PAPER.tex), [Overleaf package](SNAPSHOT_OFI_LATEX.zip), and [submission plan](LATEX_SUBMISSION_README.md). The recommended first conference is Lancaster FINEC 2027 (December 1, 2026 deadline); no paid submission has been made.
+## Current paper
 
-# OFI research: snapshot measurement, forecasts and replication
+**What snapshot sampling does to order flow imbalance** is the current nine-page LaTeX manuscript. The paper audits endpoint substitution on the same observed minute paths; it does not claim a new trading strategy or event-level replication.
 
-**Short paper:** [Read the four-page paper](SNAPSHOT_OFI_PAPER.md) or [download the editable version](SNAPSHOT_OFI_PAPER.docx). The paper develops the measurement result, checks its interpretation and states the limits.
+- [Read the PDF](SNAPSHOT_OFI_PAPER.pdf) · [LaTeX source](SNAPSHOT_OFI_PAPER.tex) · [Overleaf package](SNAPSHOT_OFI_LATEX.zip)
+- [Audit and readiness](PAPER_AUDIT.md): all-universe primary measurement recomputation, a corrected forward filter, tests and remaining limitations.
+- [Comparison with earlier work](PAPER_COMPARISON.md)
+- [Detailed NotebookLM video brief](NOTEBOOKLM_VIDEO_BRIEF.md)
+- [Dedicated paper repository](https://github.com/brendanconnelly/snapshot-ofi-paper), initially private for coauthor review. This shared branch retains the paper and evidence for existing collaborators.
+- [Protocol](RESOLUTION_PROTOCOL.md), [theory](RESOLUTION_THEORY.md), [prior work](RESOLUTION_LITERATURE.md), and [full measurement report](RESOLUTION_REPORT.md).
 
-**Supporting study:** [Snapshot measurement research note](RESOLUTION_REPORT.md) tests when endpoint OFI disagrees with summed minute increments. It includes an exact aggregation-error identity, fixed-queue price-input controls, a 483-stock resolution audit and an aggregation-preserving utility. This is a concrete methods-paper candidate; novelty and publishability remain unconfirmed. See also [theory](RESOLUTION_THEORY.md), [protocol](RESOLUTION_PROTOCOL.md) and [closest prior work](RESOLUTION_LITERATURE.md).
+The release audit corrected a missing current-return cutoff in the forward mask. Six KR training windows across four grids were affected; the measurement findings and rounded five-minute conclusions are unchanged. See the audit for exact scope. The PDF and current tables incorporate the fix. The older four-page [Markdown draft](SNAPSHOT_OFI_PAPER.md), Word file and its builder are historical, superseded artifacts retained for provenance.
 
-**Earlier decision study:** [Decision memo for the Mihai discussion](DECISION_REPORT.md) covers the earlier-period replication, exposure and concentration checks, relative-return/liquidity extensions, risk forecasts, and matched closing-session analysis. The recommendation is to stop the broad daily snapshot-alpha search and discuss the negative reconstruction honestly.
+## Earlier forecasting and trading work
 
-The next-day follow-up is complete: start with [NEXT_DAY_REPORT.md](NEXT_DAY_REPORT.md). It restores the original daily horizon, compares seven model families with matched price-history baselines, and tests top-20 and long-10/short-10 rankings. No positive primary book increment is established; all tested next-session ranking variants have negative average returns after spreads. [RANKING_REPORT.md](RANKING_REPORT.md) separately answers the minute-horizon ranking suggestion. [NOVELTY_REVIEW.md](NOVELTY_REVIEW.md) explains the substantial overlap with prior work.
+These studies answer different questions and remain part of the research record. They are not evidence that the new measurement result is profitable.
 
-The full minute-snapshot study is also complete. Start with [the research report](REPORT.md), which presents the actual findings, uncertainty, trading-cost diagnostics, and limitations. This supersedes the bounded pilot in [PILOT_README.md](PILOT_README.md).
+1. [Decision memo](DECISION_REPORT.md): daily replication, exposure/concentration checks, earlier-period comparison, risk and relative-return extensions. No validated incremental net alpha.
+2. [Next-day study](NEXT_DAY_REPORT.md): restores the original daily horizon and tests matched baselines and ranking rules.
+3. [Minute ranking follow-up](RANKING_REPORT.md): directly tests Rigel's top-20 proposal; the tested rules do not overcome spreads.
+4. [Minute-snapshot reconstruction](REPORT.md): modest short-lived queue information, with execution and cost limitations.
+5. [Original folder/code and literature audit](LITERATURE_AND_AUDIT.md), [novelty review](NOVELTY_REVIEW.md), and [historical pilot](PILOT_README.md).
 
-The run audited 516 archives, considered 377,826 stock-day files for 2017–2019, and scored 42,655,513 one-minute observations across 483 stocks in 2019, including 105 genuine ten-level names. Original data and prior project outputs remain unchanged.
+## Data and reproduction
 
-Queue imbalance adds modest predictive information beyond return history, with a larger increment near the close. This is a snapshot-data adaptation, not an exact event-OFI replication or validation of the old Sharpe ratios. Observed spread costs overwhelm the tested unconditional trading signals.
+The archive audit covered 516 archives; the 2017–2019 inventory contained 377,826 stock-day members. The measurement paper uses 483 training-eligible stocks, with level one used for all comparisons. Raw archives, caches, per-stock forecasts and fitted parameters remain local. Compact aggregate results are under `full_study/`.
 
-- [Report and results](REPORT.md)
-- [Primary specification](PRIMARY_PROTOCOL.md) and [secondary specification](PROTOCOL.md)
-- [Folder and literature audit](LITERATURE_AND_AUDIT.md)
-- Main results: `full_study/summary.csv`, `inference.csv`, `stock_heterogeneity.csv`
-- Additional open-to-current return control: `full_study/session_control_summary/`
-- Input provenance: `full_study/archives.csv`, `members.csv.gz`, `cache/*_audit.csv`
-- Reproduction commands and methodological caveats are in the report.
-
-[Event-data acquisition](DATA_REQUEST.md) is optional future work. It is not needed to use or reproduce this completed study.
+For a focused runnable package, use the dedicated repository's reproduction guide. This broader branch intentionally preserves the original experiment history and protocols. Do not interpret a chronological split as an untouched research holdout or rerun a changed specification over stale per-stock outputs. The optional [event-data request](DATA_REQUEST.md) concerns a different, stronger validation question.

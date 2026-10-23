@@ -121,7 +121,7 @@ The archive contains 483 US stocks selected by 2017 coverage, with available min
 
 We compare one-, two-, five-, ten- and thirty-minute grids, as well as a five-minute grid shifted by two minutes. The one-minute comparison is an identity check: the two constructions use the same single transition. Larger scales discard increasingly many observed states, but none supplies information between the original minute snapshots.
 
-A comparison is \emph{material} when both $|F_n|$ and $|C_n|$ exceed $\tau=0.1$ starting-depth units. For stock $i$, date $d$, and eligible blocks $w$, define
+A comparison is \emph{material} when both $|F_n|$ and $|C_n|$ exceed $\tau=0.1$ starting-depth units. This headline cutoff followed the raw-file precision audit; the original near-zero and fine-only threshold summaries remain in the supporting outputs. For stock $i$, date $d$, and eligible blocks $w$, define
 \begin{equation}
  p_{id}(\tau)=\frac{\sum_w\ind\{|F_{idw}|>\tau,|C_{idw}|>\tau,F_{idw}C_{idw}<0\}}
  {\sum_w\ind\{|F_{idw}|>\tau,|C_{idw}|>\tau\}}.
@@ -132,14 +132,14 @@ We average $p_{id}$ equally across stocks within a date, omitting stock-days wit
 Intervals use 2,000 circular moving-block bootstrap draws of dates, with block length 20 trading days and seed 279. Resampling dates jointly across stocks preserves their observed contemporaneous dependence; consecutive dates within a block retain short-range temporal dependence. It does not establish independence beyond that scale or account for research choices made after looking at the archive. We examine block lengths 10 and 40 as descriptive sensitivity checks.
 
 \subsection{Explanatory and forward models}
-For each stock and scale, we fit ridge regressions on 2017, select the penalty from $\{0.01,1\}$ using 2018, refit through 2018 and evaluate in 2019. Training observations determine feature clipping at the 0.001 and 0.999 quantiles and subsequent standardization. Each same-block model has one feature: $F_n$, $C_n$, or a frozen-size endpoint control
+For each stock and scale, we fit ridge regressions on 2017, select the penalty from $\{0.01,1\}$ using 2018, refit through 2018 and evaluate in 2019. Training observations determine feature clipping at the 0.001 and 0.999 quantiles and subsequent standardization. The ridge objective averages squared loss over training observations, penalizes slopes and leaves the intercept unpenalized. Each same-block model has one feature: $F_n$, $C_n$, or a frozen-size endpoint control
 \begin{equation}
  Z_n=\frac{q^b_0\sgn(b_n-b_0)+q^a_0\sgn(a_n-a_0)}{D_0}.
  \label{eq:frozen}
 \end{equation}
 This removes within-block size changes but retains the observed price moves. It is therefore an explanatory control, not an independently observed flow variable.
 
-The forward target is the midpoint log return over the following block. The baseline uses the current and previous block returns, endpoint spread, log depth and queue imbalance, and trailing five- and thirty-minute returns. We add either $F_n$ or $C_n$ to that baseline. Predictors are observed by the current block's endpoint; target-path validity is an eligibility filter, not a predictor. Paired comparisons use identical eligible windows. The current-return models and next-return models answer different questions, even though their fitting chronology is the same.
+The forward target is the midpoint log return over the following block. The baseline uses the current and previous block returns, endpoint spread, log depth and queue imbalance, and trailing five- and thirty-minute returns. We add either $F_n$ or $C_n$ to that baseline. Both current- and following-block absolute log returns must be below 0.2. Predictors are observed by the current block's endpoint; target-path validity is an eligibility filter, not a predictor. Paired comparisons use identical eligible windows. The current-return models and next-return models answer different questions, even though their fitting chronology is the same.
 
 Let $L_m$ denote model $m$'s mean squared error, first averaged within each stock-day, then equally across stocks within dates and across dates. Let $L_0$ use the corresponding stock's training-period mean return. We report
 \begin{equation}
@@ -221,7 +221,7 @@ Our implementation checks contiguous observation times and matching boundary sta
 
 We checked numerical precision because sign comparisons are sensitive near zero. Cached sizes are reconstructed from float32 log-depth and imbalance. In an audit of 18 original stock-day files spanning six stocks and all three years, four exact zero flows became tiny nonzero cached values. The largest sampled normalized five-minute flow error was 0.000122. This motivated reporting thresholds of 0.001, 0.01 and 0.1 rather than relying on an almost-zero cutoff. The audit is a selected sample check, not a universal numerical error bound.
 
-Across eligible blocks, the largest normalized residual in the aggregation identity was $4.86\times10^{-11}$ or less. We independently replayed 210 saved models against 7,560 stock-day losses, with maximum MSE difference below $3.4\times10^{-21}$. All 17 relevant implementation and statistical tests pass. These checks support the stated calculations; they cannot correct selection in the source archive, supply missing event data, or establish novelty.
+Across eligible blocks, the largest normalized residual in the aggregation identity was $4.86\times10^{-11}$ or less. We independently replayed 210 saved models against 7,560 stock-day losses, with maximum MSE difference below $3.4\times10^{-21}$. All 18 paper-specific implementation and statistical tests pass. A release audit independently recomputed the primary measurement across all 483 cached stocks and reproduced every material count. It also identified a missing current-return exclusion in the forward mask: six training windows for one stock across four grids were affected. We corrected the mask, reran the affected models and added a regression test. The correction leaves the measurement results and rounded five-minute forward conclusions unchanged. These checks support the stated calculations; they cannot correct selection in the source archive, supply missing event data, or establish novelty.
 
 \section{Discussion and conclusion}
 We find a substantial difference between two constructions that can otherwise look like interchangeable implementations of snapshot OFI. In the primary comparison, endpoint substitution changes the sign in about one in six material five-minute windows. The effect is present across years, grid phases and stocks, and becomes larger on the coarser grids considered. A high contemporaneous $R^2$ does not make that measurement difference disappear.

@@ -1,0 +1,35 @@
+{
+  "status": "passed",
+  "stocks": 483,
+  "stock_days": 358807,
+  "windows": 25475162,
+  "excluded": 135,
+  "max_direct_vs_prefix_error": 1.7280399333685637e-11,
+  "material_rates": {
+    "2017": 0.1597655490005084,
+    "2018": 0.17082598969922091,
+    "2019": 0.17031980599049115
+  },
+  "year2019_counts": {
+    "n": 8436055,
+    "both": 8091184,
+    "opposite": 1377269
+  },
+  "forward_extreme_current_blocks": 0,
+  "refitted_models": 15,
+  "source_hashes_match": {
+    "resolution_study.py": true,
+    "resolution_transform.py": true,
+    "resolution_tools.py": true,
+    "resolution_null.py": true,
+    "resolution_sensitivity.py": true,
+    "resolution_heterogeneity.py": true,
+    "summarize_resolution.py": true,
+    "verify_resolution.py": true,
+    "replay_resolution.py": true,
+    "report_resolution.py": true,
+    "test_resolution.py": true,
+    "RESOLUTION_PROTOCOL.md": true
+  },
+  "scope": "Independent direct five-minute sums and all material counts across cached universe; selected refits. Raw-file provenance is separately sampled, not exhaustively re-extracted."
+}

@@ -1,0 +1,59 @@
+{
+  "reason": "Forward mask omitted current-block extreme-return exclusion; now requires both current and following returns to be finite and below 0.2 absolute log return.",
+  "affected_stocks": [
+    "KR"
+  ],
+  "excluded_forward_windows": [
+    {
+      "ticker": "KR",
+      "date": "2017-10-11",
+      "h": 1,
+      "offset": 0,
+      "start": 121,
+      "return_value": 7.775217275888267
+    },
+    {
+      "ticker": "KR",
+      "date": "2017-10-11",
+      "h": 1,
+      "offset": 0,
+      "start": 125,
+      "return_value": -7.7714154933908
+    },
+    {
+      "ticker": "KR",
+      "date": "2017-10-11",
+      "h": 2,
+      "offset": 0,
+      "start": 120,
+      "return_value": 7.775217275888267
+    },
+    {
+      "ticker": "KR",
+      "date": "2017-10-11",
+      "h": 2,
+      "offset": 0,
+      "start": 124,
+      "return_value": -7.7714154933908
+    },
+    {
+      "ticker": "KR",
+      "date": "2017-10-11",
+      "h": 5,
+      "offset": 0,
+      "start": 125,
+      "return_value": -7.752622363362365
+    },
+    {
+      "ticker": "KR",
+      "date": "2017-10-11",
+      "h": 5,
+      "offset": 2,
+      "start": 122,
+      "return_value": -7.757755765686789
+    }
+  ],
+  "max_r2_absolute_change_all_grids": 4.441897283300172e-06,
+  "max_relative_gain_absolute_change_all_grids": 4.224412924578196e-06,
+  "max_r2_absolute_change_primary": 2.1033902799952146e-08
+}

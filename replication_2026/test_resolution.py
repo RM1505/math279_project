@@ -19,6 +19,15 @@ class ResolutionTests(unittest.TestCase):
     def test_frozen_queue_null(self):
         rng=np.random.default_rng(279);r=rng.normal(size=500000);x=2*np.sign(r)
         self.assertAlmostEqual(np.corrcoef(r,x)[0,1]**2,2/np.pi,delta=.003)
+    def test_forward_excludes_extreme_current_return(self):
+        x=np.ones((1,391,14)); mid=np.full(391,100.); mid[35:]=1000.
+        x[0,:,0]=mid;x[0,:,1]=mid-.01;x[0,:,2]=mid+.01;x[0,:,7]=np.log(100);x[0,:,8]=.2
+        z=blocks(x,np.array(['2019-01-02']),5,0)
+        self.assertTrue(z['good'][0,0])
+        self.assertGreater(abs(z['ret'][0,0]),.2)
+        self.assertAlmostEqual(z['forward'][0,0],0.)
+        self.assertFalse(z['forwardgood'][0,0])
+
     def test_future_states_cannot_change_current_pressure(self):
         x=np.ones((1,391,14));x[0,:,0]=100+np.arange(391)*.001;x[0,:,1]=x[0,:,0]-.01;x[0,:,2]=x[0,:,0]+.01;x[0,:,7]=np.log(100);x[0,:,8]=.2
         a=blocks(x,np.array(['2019-01-02']),5,0);x[:,36:,1:3]+=2;b=blocks(x,np.array(['2019-01-02']),5,0)

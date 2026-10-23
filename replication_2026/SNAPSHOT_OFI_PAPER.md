@@ -1,3 +1,5 @@
+> **Historical draft:** Superseded by the audited [nine-page LaTeX paper](SNAPSHOT_OFI_PAPER.pdf). This four-page source is retained for provenance; consult the current PDF and [audit](PAPER_AUDIT.md).
+
 # What snapshot sampling does to order flow imbalance
 
 Brendan Connelly and Rigel Mummers  

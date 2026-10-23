@@ -39,7 +39,7 @@ def blocks(x,dates,h,offset):
     ret=np.log(mid[:,ends]/mid[:,starts]);lag=np.log(mid[:,starts]/mid[:,starts-h]) if h<=30 else ret*np.nan
     # Forward target ends at the next block endpoint; aligned within each session.
     nxt=ends+h;futuregood=nxt<=385;clipped=np.minimum(nxt,390)
-    forward=np.log(mid[:,clipped]/mid[:,ends]);forwardgood=good&futuregood[None,:]&((invalid[:,clipped+1]-invalid[:,ends])==0)
+    forward=np.log(mid[:,clipped]/mid[:,ends]);forwardgood=good&np.isfinite(ret)&(abs(ret)<.2)&futuregood[None,:]&((invalid[:,clipped+1]-invalid[:,ends])==0)
     baseline=np.stack([ret,lag,x[:,ends,6],x[:,ends,7],x[:,ends,8],x[:,ends,4],x[:,ends,5]],axis=-1)
     forwardgood &= np.isfinite(baseline).all(-1)&np.isfinite(forward)&(abs(forward)<.2)
     # Verify the exact path correction on all valid blocks with unnormalized quantities.
