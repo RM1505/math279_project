@@ -1,3 +1,5 @@
+> **Updated October 24:** This is the initial review. The [extension literature audit](EXTENSION_LITERATURE.md) supersedes its statement that a generalized-OFI comparison is not yet implemented. The original search record is retained below.
+
 # Novelty check: snapshot OFI aggregation and price-input controls
 
 Checked 21 October 2026. This targeted search is not proof that no prior paper contains the same result. No journal acceptance or unique contribution is established.

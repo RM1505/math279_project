@@ -2,7 +2,8 @@
 ## A detailed source and production brief for NotebookLM
 
 **Authors:** Brendan Connelly and Rigel Mummers.  
-**Project:** Snapshot OFI measurement study.  
+**Project:** Snapshot OFI measurement study, updated October 24, 2026.
+
 **Status:** Research manuscript, not an accepted publication and not a validated trading strategy.  
 **Audience:** Someone who understands basic statistics but may never have seen an order book. Build toward the mathematics rather than assuming market-microstructure knowledge.
 
@@ -48,7 +49,7 @@ Suggested visual: show two price ladders with quantities, highlight only the bes
 
 The local archive contains snapshots every sixty seconds. Some files contain one book level and some contain ten. Large processed files contain derived features; their size does not mean the missing event stream can be recovered from them. There is no complete sub-minute sequence in this study.
 
-The paper uses 483 US stocks selected using coverage in 2017 and follows available data through 2019. Selection uses 2017 only, but the original archive itself may still have survivorship or coverage bias. Of the selected stocks, 378 have one-level source files and 105 have ten-level source files. **Every paper comparison uses only level one**, so the depth groups do not constitute a controlled experiment in adding deeper information.
+The paper uses 483 US stocks selected using coverage in 2017 and follows available data through 2019. Selection uses 2017 only, but the original archive itself may still have survivorship or coverage bias. Of the selected stocks, 378 have one-level source files and 105 have ten-level source files. **The main 483-stock comparison uses only level one**, so the depth groups do not constitute a controlled experiment in adding deeper information.
 
 The primary measurement has 25,475,162 valid five-minute blocks over 358,807 stock-days. A stock-day means one stock on one trading date; it is not a separate trading date. Blocks do not overlap, begin at 10:00, and end by 15:55. Shortened and exceptional sessions were removed upstream. An additional 135 candidate five-minute blocks fail the stated within-block validity or extreme-return checks. This exclusion count is conditional on the already constructed cache, not the number of raw records ever excluded during preprocessing.
 
@@ -278,18 +279,18 @@ The current paper does not validate the original reported Sharpe ratios. It avoi
 ## 13. What prior research already established
 
 - **Cont, Kukanov and Stoikov (2014), The Price Impact of Order Book Events:** defines and sums event contributions and relates them to contemporaneous prices. Correctly retained increments are additive. This paper does not challenge that construction. https://doi.org/10.1093/jjfinec/nbt003
-- **Su, Sun, Li and Yuan (2021), The Price Impact of Generalized Order Flow Imbalance:** explicitly addresses snapshot limitations and multi-tick changes using a generalized construction. This is the closest overlap. The current paper does not implement or outperform their estimator. https://arxiv.org/abs/2112.02947
+- **Su, Sun, Li and Yuan (2021), The Price Impact of Generalized Order Flow Imbalance:** explicitly addresses snapshot limitations and multi-tick changes using a generalized construction. This is the closest overlap. The updated paper implements a bounded literal-grid comparison and a labeled price-aligned adaptation; it does not replicate their Chinese-equity fit study or establish event-level superiority. https://arxiv.org/abs/2112.02947
 - **Cont, Cucuringu and Zhang (2023), Cross-Impact of Order Flow Imbalance in Equity Markets:** distinguishes contemporaneous impact from lagged forecasting and studies integrated levels and cross-asset effects. The current paper’s question is temporal endpoint substitution. https://arxiv.org/abs/2112.13213
 - **Gould and Bonart, Queue Imbalance as a One-Tick-Ahead Price Predictor:** studies predictive information in the book state, a different object and horizon. https://arxiv.org/abs/1512.03492
 - **Xu, Gould and Howison, Multi-Level Order-Flow Imbalance in a Limit Order Book:** studies contemporaneous fit using more book levels. https://arxiv.org/abs/1907.06230
 
-The proposed contribution is the combined empirical measurement audit and interpretation, not the invention of OFI, recognition that snapshots miss events, generic additive aggregation, or Gaussian sign identities. Literature searches cannot prove originality. A common-data generalized-OFI comparison and feedback from researchers in this area would strengthen the publication case.
+The proposed contribution is the combined empirical measurement audit and interpretation, not the invention of OFI, recognition that snapshots miss events, generic additive aggregation, or Gaussian sign identities. Literature searches cannot prove originality. The bounded generalized comparison is now complete, with substantial coverage limits. Expert feedback on distinctness and an independent sample would strengthen the publication case.
 
 ## 14. The practical remedy
 
-Before discarding an observed path, retain its summed bid contributions and summed reversed-ask contributions. Also retain the first and last timestamp and quote state. For normalization, retain the needed depth quantities: the starting quote for starting-depth normalization, or a depth sum and increment count for mean-depth normalization.
+Before discarding an observed path, retain its summed bid contributions and summed reversed-ask contributions. Also retain the first and last timestamp and quote state. For normalization, retain the needed depth quantities: the starting quote for starting-depth normalization, or a depth sum and increment count for mean-destination-depth normalization. These do not preserve arbitrary later weighting rules or queries inside a chunk; retain finer increments for those uses.
 
-Adjacent chunks can then be merged by adding the summaries, provided their shared boundary time and state match and there is no gap. The shared observation is a boundary, not an extra duplicated transition. The implementation checks these conditions and is tested against direct aggregation.
+Adjacent chunks can then be merged by adding the summaries, provided their shared boundary time and state match and there is no gap and the observation spacings match. The shared observation is a boundary, not an extra duplicated transition. The implementation checks these conditions and is tested against direct aggregation.
 
 This is a straightforward data-engineering practice, not a new compression algorithm. Its value is preventing avoidable loss. It cannot reconstruct the unobserved sub-minute events.
 
@@ -305,6 +306,30 @@ The broader research test suite and the paper-specific tests cover signs, path i
 
 Raw data and per-stock fitted outputs are not redistributed. The paper repository contains source, synthetic tests and compact result tables. Readers can inspect the calculations and rerun the data-free checks; full empirical reruns require the original input archive or compatible licensed data.
 
+## Extension: why selection and remedies now belong in the video
+
+Please give the new extension its own substantial chapter before the closing interpretation. It makes the practical question more concrete and prevents presenting a known snapshot limitation as an undiscovered flaw.
+
+**Ranking example.** At each five-minute timestamp, choose the 20 stocks with the largest absolute minute-sum OFI and separately the 20 with the largest absolute endpoint OFI. Show two lists, connecting matching names. Their 2019 mean intersection is 10.34 names: 51.71% overlap, interval 50.24–53.20%. About 9.66 names in each list differ. This is not Jaccard similarity. Shared names also have opposite signs 9.34% of the time under the stated averaging. Absolute-rank correlation is 0.4215; these are related rankings, not random lists.
+
+**Scaling check.** Divide both measures by each stock's 2017 ninetieth percentile of absolute minute-sum OFI. Top-20 overlap is then 49.59% (48.09–51.21%). Top-5/top-50 sensitivities are included in the extension report. Explain why ranking can ignore a common positive rescaling but cannot undo a change in ordering. These are ranks of measured OFI, not ranks of forecast returns. Do not imply that this experiment evaluates trade profitability or reverses the earlier negative trading-cost result.
+
+**Trying to reconstruct the lost sum.** The target is observed minute-sum F. A calibrated endpoint model has 17.04% material sign error; a fixed nine-feature endpoint ridge model has 18.93%, versus 17.03% for raw endpoint C. MSE increases by 6.38% and 4.97%. These specified regressions fail, but this is not proof that every flexible endpoint predictor must fail. Exact deterministic recovery and average statistical estimation are different questions.
+
+**Deeper queues can help, with a cost.** Explain the generalized construction using an upward best bid: count the new displayed queues back through the old best price, then subtract the old best size. Distinguish the literal contiguous one-cent grid from the price-aligned adaptation that permits gaps between occupied levels. They agree where the required ladder is contiguous and visible. Do not fill unseen queues with zero, call either variant log-GOFI, or imply it is the standard operator unchanged.
+
+The raw diagnostic uses 105 ten-level stocks on four dates, one per quarter in 2019: 420 stock-days and 29,820 candidate windows. Only 57.60% of candidate windows have sufficient depth for both price-aligned constructions. On the same windows where all four measures are material, standard endpoint-versus-sum disagreement is 21.71%; generalized endpoint-versus-its-own-sum disagreement is 7.02%. These rates average 414 nonempty stock-days and use 16,264 material windows. The paired material rule was added after initial results and is disclosed as such.
+
+Show the coverage loss next to the improvement: first draw 100 candidate windows, shade roughly 42 as unavailable, then compare the two disagreement rates within the eligible material subset. Do not imply 7.02% was measured on all 100 windows. The literal tick-grid version has only 32.03% coverage, 9,222 common material windows and 234 nonempty stock-days; its paired rates are 21.22% and 3.47%. Different retained samples prevent ranking the two conventions fairly against each other. Four dates do not support a reliable temporal confidence interval.
+
+The standard full four-date rate before the depth filter is 18.50%, not the full-year 17.03%. This explains why the table should not be visually presented as a drop from 17.03% to 7.02% on the same sample. Generalized OFI targets another observed quantity, so better agreement with its own sum is not proven recovery of standard minute OFI or true event OFI.
+
+**What was already known.** Su and coauthors already addressed snapshot limitations. Ghysels and Nguyen (2019, p.17) explicitly sum fine tick-snapshot contributions into minute OFI. The current original project helper also sums weighted minute contributions. Therefore the new result is not a demonstrated explanation of our old strategy's weakness. No claim of widespread improper aggregation was established. The possible contribution is the specific paired measurement/selection/coverage audit, not discovering that snapshots lose information.
+
+**Practical ending.** If fine observations are still available, calculate and retain contributions before discarding them. The implementation checks observation spacing and boundaries and preserves additive sums over whole chunks. Different denominators and future weighting choices need their own retained statistics. No new event-OFI definition is necessary. If only endpoints remain, statistical estimation needs assumptions and uncertainty; exact universal recovery is unavailable.
+
+The extension's independent replay checks 1,704 selection calculations and selected reconstruction refits. Its protocol, negative outcomes and limits are recorded in the report. Give these qualifications as part of the explanation, not a tiny disclaimer at the end.
+
 ## 16. A suggested chapter plan
 
 1. **The puzzle:** show opposite arrows from the same observed interval. Ask why both calculations can be internally correct.
@@ -317,8 +342,9 @@ Raw data and per-stock fitted outputs are not redistributed. The paper repositor
 8. **The actual study:** sample, chronology, material threshold, balanced weighting and bootstrap.
 9. **Results:** animate the scale table, then compare raw, bounded and frozen explanatory features. Keep the bounded result prominent.
 10. **The forecasting check:** distinguish current-price explanation from next-return prediction and explain the corrected mask.
-11. **What to retain:** demonstrate the mergeable summary and its limits.
-12. **What we can responsibly say:** a concrete measurement result, a plausible research note, unresolved novelty and event-level validation.
+11. **Selection and repairs:** show the two top-20 lists, failed endpoint regressions, and generalized-OFI improvement alongside lost coverage.
+12. **What to retain:** demonstrate the mergeable summary and its limits.
+13. **What we can responsibly say:** a concrete measurement result, a plausible research note, unresolved novelty and event-level validation.
 
 Finish with the scientific takeaway, not an investment slogan: **Specify what was observed, preserve what can be added, and do not use fit to answer a different measurement question.**
 
@@ -339,4 +365,4 @@ Finish with the scientific takeaway, not an investment slogan: **Specify what wa
 
 ## Sources to upload alongside this brief
 
-Upload the current `paper/SNAPSHOT_OFI_PAPER.pdf`, this briefing, `docs/AUDIT_AND_READINESS.md`, and `docs/COMPARISON_WITH_EARLIER_WORK.md`. The compact tables in `results/` are the numerical source. The original broader research remains at https://github.com/RM1505/math279_project/tree/research/ofi-snapshot-study-2026/replication_2026. The separate paper repository is https://github.com/brendanconnelly/snapshot-ofi-paper; its private status may prevent automatic URL ingestion, so uploading the documents is the reliable handoff.
+Upload the current `paper/SNAPSHOT_OFI_PAPER.pdf`, `docs/EXTENSION_REPORT.md`, `docs/EXTENSION_LITERATURE.md`, this briefing, `docs/AUDIT_AND_READINESS.md`, and `docs/COMPARISON_WITH_EARLIER_WORK.md`. The compact tables in `results/` are the numerical source. The original broader research remains at https://github.com/RM1505/math279_project/tree/research/ofi-snapshot-study-2026/replication_2026. The separate paper repository is https://github.com/brendanconnelly/snapshot-ofi-paper; its private status may prevent automatic URL ingestion, so uploading the documents is the reliable handoff.

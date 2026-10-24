@@ -32,7 +32,7 @@ The answer is no to both. The paper gives the exact difference, an endpoint ambi
 | Main evidence | Forecast losses, rankings, portfolios and costs | Algebra, paired sign disagreements, fit diagnostics and a limited forward check |
 | Main horizon | Overnight/next-day; minute follow-ups | One–thirty minutes, with five-minute measurement primary |
 | Cross-stock modeling | Central to the original idea | Not the object of this paper |
-| Deeper-book information | Integrated or compared in prior designs | Level one used for every stock |
+| Deeper-book information | Integrated or compared in prior designs | Level one in the main study; bounded ten-level generalized benchmark on four dates |
 | Sample | Multiple historical/modern experiments | 483 training-eligible stocks, 2017–2019 |
 | Strongest finding | Short-lived information, without validated net alpha | 17.03% material five-minute sign disagreement in 2019 |
 | Success criterion | Incremental, repeatable benefit beyond controls and costs | Consequential, correctly characterized measurement difference |
@@ -46,7 +46,7 @@ The core result is direct, easy to interpret and independently reproduced across
 
 ## What is not established
 
-A measurement problem is not automatically a publishable contribution. Endpoint non-additivity is elementary, and generalized snapshot OFI is relevant prior work. We have not implemented a common-data GOFI benchmark or validated against an event-level sample. The paper therefore needs expert novelty feedback, especially from Mihai, before making a strong originality claim. A useful conference discussion is a more realistic immediate objective than claiming a new profitable strategy.
+A measurement problem is not automatically a publishable contribution. Endpoint non-additivity is elementary, and generalized snapshot OFI is relevant prior work. We have now implemented a bounded common-data generalized-OFI benchmark, but have not validated against an event-level sample. The coverage limits and four-date design prevent a claim of broad estimator superiority. The paper therefore needs expert novelty feedback, especially from Mihai, before making a strong originality claim. A useful conference discussion is a more realistic immediate objective than claiming a new profitable strategy.
 
 ## What to tell Mihai
 
@@ -63,3 +63,11 @@ These links preserve the broader research record:
 - [Ranking follow-up](https://github.com/RM1505/math279_project/blob/research/ofi-snapshot-study-2026/replication_2026/RANKING_REPORT.md)
 - [Next-day reconstruction](https://github.com/RM1505/math279_project/blob/research/ofi-snapshot-study-2026/replication_2026/NEXT_DAY_REPORT.md)
 - [Decision-stage audit and earlier-period comparison](https://github.com/RM1505/math279_project/blob/research/ofi-snapshot-study-2026/replication_2026/DECISION_REPORT.md)
+
+## What the October 24 extension changes
+
+The current original helper `src/ofi.py` sums per-minute normalized contributions with exponential weights. It does not replace the day by two endpoint states. The checked source hash is recorded in the focused repository. This is an inspection of the current helper, not certification of earlier code versions or Sharpe ratios. It makes explicit that the new measurement paper is an offshoot, not a demonstrated explanation of the original strategy's weakness.
+
+The extension adds a consequence closer to a research decision: the two five-minute OFI constructions share only 51.71% of their top-20 absolute-feature selections. This is different from ranking predicted returns and does not overturn the earlier trading-cost findings. Endpoint regressions fail to improve reconstruction in the tested family. Generalized OFI is more stable against its own sum on the sampled deep-book windows, but requires unavailable depth in many cases.
+
+The paper now has a clearer practical purpose: auditing measurement and selection when changing observation grids, and choosing what to retain before discarding data. It is still not an exact replication or refutation of Mihai's earlier work, and it does not require a new definition of event OFI.

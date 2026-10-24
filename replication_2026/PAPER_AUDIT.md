@@ -1,6 +1,7 @@
 # Release audit and readiness assessment
 
-**Audit date:** October 22, 2026.  
+**Audit date:** October 24, 2026 (extends the October 22 release audit).
+
 **Assessment:** Ready for coauthor and Mihai review as a carefully qualified measurement paper. The data-free package is runnable and the primary empirical result has been independently recomputed from the complete cached study universe. This is not certification of novelty, event-level validity, the original trading claims, or acceptance readiness independent of author approval.
 
 ## What was actually audited
@@ -54,7 +55,7 @@ The correction requires finite current returns with absolute log return below 0.
 
 **Still needed before formal submission:** both authors' final approval, current affiliations and presenting/corresponding-author details, confirmation of any data-use obligations, and the chosen venue's submission requirements/payment. The existing conference plan is a recommendation, not a submitted application.
 
-**Still scientifically unresolved:** whether the combined audit is sufficiently distinct from generalized snapshot OFI and other temporal-measurement work; how either measure compares with true event-level OFI; how broadly the result generalizes beyond this archive. An expert novelty review and a common-data GOFI comparison would strengthen the case. The one-level majority constrains that benchmark; it does not justify pretending the comparison was performed.
+**Still scientifically unresolved:** whether the combined audit is sufficiently distinct from generalized snapshot OFI and other temporal-measurement work; how either measure compares with true event-level OFI; how broadly the result generalizes beyond this archive. A bounded common-data generalized comparison is now complete on 105 stocks and four dates. It shows improved aggregation stability with substantial finite-depth censoring, not event-level accuracy or a full-year replication. Expert novelty review and independent validation remain important.
 
 **Not ready to claim:** a profitable strategy, validated original daily Sharpe ratios, universal failure of OFI prediction, a causal decomposition of price impact, or a guaranteed publishable contribution.
 
@@ -67,3 +68,15 @@ The correction requires finite current returns with absolute log return below 0.
 - `RELEASE_MANIFEST.json` hashes the focused repository's deliverables and adapted code. Adapted source hashes legitimately differ from the historical study hashes.
 
 The old backups remain local and were not mixed into the current tables. The shared research repository preserves the broader history. The new private repository is a focused presentation of the paper, not a rewrite of that history into a clean confirmatory experiment.
+
+## Extension verification, October 24
+
+- All 29 data-free tests pass, including new generalized formula/coverage, mixed-grid normalization and ranking tests.
+- Independently replayed 1,704 timestamp/scaling/k selections using direct transition sums and separately ordered sets. Maximum daily metric difference is 3.34e-16; direct flow difference is 2.62e-12 or less.
+- Refit ten endpoint-reconstruction models for AAL, CNC, GS, MNST and SNPS, plus five raw-endpoint references. All their 2019 daily losses and material sign counts match; maximum absolute MSE difference is 7.28e-12. These refits reuse the tested ridge helper; they are not a separate implementation of ridge.
+- The all-universe reconstruction outputs reproduce every original 2019 primary count.
+- The generalized diagnostic validates 420 raw stock-day grids, checks count nesting, records local source hashes, and reports coverage and nonempty stock-days. Four dates are deliberately not assigned a temporal bootstrap interval.
+- A post-result all-four-material check prevents differing pairwise denominators from being presented as an exact paired improvement. Both initial and matched summaries are retained.
+- The current original weighted-minute helper and a pinned public correct-summation implementation were inspected. No claim of widespread endpoint misuse is supported.
+
+The [extension report](EXTENSION_REPORT.md) documents all specified outcomes, including failed fitted repairs. `results/extension/audit.json` records the new replay scope. The LaTeX claim check now covers the extension tables and intervals as well as the earlier findings. The PDF remains nine pages and is compiled and visually reviewed before release.

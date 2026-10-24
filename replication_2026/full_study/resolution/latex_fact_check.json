@@ -136,6 +136,82 @@
     {
       "claim": "scope",
       "checked_text": "0.001 and 0.999"
+    },
+    {
+      "claim": "top20 raw",
+      "checked_text": "Starting-depth units&51.71 [50.24, 53.20]&9.34"
+    },
+    {
+      "claim": "top5 raw",
+      "checked_text": "54.66\\%"
+    },
+    {
+      "claim": "top50 raw",
+      "checked_text": "47.42\\%"
+    },
+    {
+      "claim": "top20 training_scaled",
+      "checked_text": "Common training scale&49.59 [48.09, 51.21]&8.76"
+    },
+    {
+      "claim": "top5 training_scaled",
+      "checked_text": "54.28\\%"
+    },
+    {
+      "claim": "top50 training_scaled",
+      "checked_text": "45.92\\%"
+    },
+    {
+      "claim": "gofi contiguous_ticks",
+      "checked_text": "Tick grid&32.03&9,222&234&21.22&3.47"
+    },
+    {
+      "claim": "gofi full standard",
+      "checked_text": "18.50\\%"
+    },
+    {
+      "claim": "gofi price_aligned",
+      "checked_text": "Price-aligned&57.60&16,264&414&21.71&7.02"
+    },
+    {
+      "claim": "gofi full standard",
+      "checked_text": "18.50\\%"
+    },
+    {
+      "claim": "reconstruction sign calibrated_endpoint",
+      "checked_text": "17.04\\%"
+    },
+    {
+      "claim": "reconstruction loss calibrated_endpoint",
+      "checked_text": "6.38\\%"
+    },
+    {
+      "claim": "reconstruction interval calibrated_endpoint",
+      "checked_text": "2.66--11.41\\%"
+    },
+    {
+      "claim": "reconstruction sign raw_endpoint",
+      "checked_text": "17.03\\%"
+    },
+    {
+      "claim": "reconstruction sign rich_endpoint",
+      "checked_text": "18.93\\%"
+    },
+    {
+      "claim": "reconstruction loss rich_endpoint",
+      "checked_text": "4.97\\%"
+    },
+    {
+      "claim": "reconstruction interval rich_endpoint",
+      "checked_text": "1.37--10.08\\%"
+    },
+    {
+      "claim": "extension scope",
+      "checked_text": "not predicted returns or realized trades"
+    },
+    {
+      "claim": "extension scope",
+      "checked_text": "four dates do not support a reliable temporal confidence interval"
     }
   ]
 }

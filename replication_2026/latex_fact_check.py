@@ -30,5 +30,25 @@ for row in pd.read_csv(R/'model_contrasts.csv').query('h == 5 and offset == 0').
         contains(row.comparison+' interval',f'[{100*row.low:.4f},{100*row.high:.4f}]')
 for phrase in ['Neither is event-level OFI','does not make 2019 an untouched research holdout','post-result descriptive','pending coauthor review','0.001 and 0.999']:
     contains('scope',phrase)
+extension=R/'extension'
+a=pd.read_csv(extension/'selection_summary.csv')
+for mode,label in [('raw','Starting-depth units'),('training_scaled','Common training scale')]:
+    g=a.query('k==20 and scaling==@mode').set_index('metric');v=g.loc['overlap'];o=g.loc['intersection_opposite']
+    contains('top20 '+mode,f"{label}&{100*v.estimate:.2f} [{100*v.low:.2f}, {100*v.high:.2f}]&{100*o.estimate:.2f}")
+    for k in [5,50]:
+        v=a.query('k==@k and scaling==@mode and metric=="overlap"').iloc[0]
+        contains(f'top{k} {mode}',f'{100*v.estimate:.2f}\\%')
+g=pd.read_csv(extension/'gofi_summary.csv').query('comparison=="generalized_endpoint_vs_sum"').set_index('convention')
+for v in pd.read_csv(extension/'gofi_paired_summary.csv').itertuples():
+    label={'price_aligned':'Price-aligned','contiguous_ticks':'Tick grid'}[v.convention]
+    contains('gofi '+v.convention,f'{label}&{100*g.loc[v.convention,"retention"]:.2f}&{v.material:,}&{v.nonempty_stock_days}&{100*v.standard_rate:.2f}&{100*v.generalized_rate:.2f}')
+    contains('gofi full standard',f'{100*v.full_standard_rate:.2f}\\%')
+for v in pd.read_csv(extension/'reconstruction_summary.csv').itertuples():
+    contains('reconstruction sign '+v.model,f'{100*v.sign_error:.2f}\\%')
+    if v.model!='raw_endpoint':
+        contains('reconstruction loss '+v.model,f'{-100*v.mse_gain_vs_raw:.2f}\\%')
+        contains('reconstruction interval '+v.model,f'{-100*v.mse_gain_high:.2f}--{-100*v.mse_gain_low:.2f}\\%')
+for phrase in ['not predicted returns or realized trades','four dates do not support a reliable temporal confidence interval']:
+    contains('extension scope',phrase)
 (R/'latex_fact_check.json').write_text(json.dumps({'status':'passed','checks':checks},indent=2)+'\n')
 print(f'Passed {len(checks)} LaTeX table, robustness and scope checks')

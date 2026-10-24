@@ -1,0 +1,33 @@
+{
+  "status": "passed",
+  "independent_selection_checks": 1704,
+  "selection_dates": [
+    "2019-01-02",
+    "2019-04-01",
+    "2019-07-01",
+    "2019-10-01"
+  ],
+  "selection_max_error": 3.3306690738754696e-16,
+  "direct_flow_max_error": 2.6147972675971687e-12,
+  "reconstruction_refits": 10,
+  "raw_endpoint_replays": 5,
+  "reconstruction_stocks": [
+    "AAL",
+    "CNC",
+    "GS",
+    "MNST",
+    "SNPS"
+  ],
+  "reconstruction_max_mse_error": 7.275957614183426e-12,
+  "primary_counts_reproduced": {
+    "valid": 8436055,
+    "material": 8091184,
+    "opposite": 1377269
+  },
+  "gofi_stock_days": 420,
+  "gofi_paired_nonempty": {
+    "contiguous_ticks": 234,
+    "price_aligned": 414
+  },
+  "limitations": "Selected reconstruction refits reuse the tested fitting helper; selection replay independently orders sets and directly sums transitions. GOFI tests check formula cases and coverage, not event-level validity."
+}

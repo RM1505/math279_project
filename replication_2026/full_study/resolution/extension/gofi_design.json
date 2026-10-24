@@ -1,0 +1,16 @@
+{
+  "stocks": 105,
+  "stock_days": 420,
+  "dates": [
+    "2019-01-02",
+    "2019-04-01",
+    "2019-07-01",
+    "2019-10-01"
+  ],
+  "sampling": "first available regular date of each 2019 quarter per stock",
+  "bootstrap": "none; sparse date coverage",
+  "interpretation": "each operator has its own sum; disagreement with standard sum is not evidence GOFI is wrong",
+  "source": "https://arxiv.org/pdf/2112.02947 equations 9-10",
+  "tick_price_units": 100,
+  "finite_depth": "missing when boundary not covered; no truncated-depth imputation"
+}

@@ -1,0 +1,23 @@
+{
+  "status": "exploratory; protocol fixed before these extension results",
+  "stocks": 483,
+  "dates": 246,
+  "h": 5,
+  "primary_k": 20,
+  "minimum_common_stocks": 100,
+  "features": [
+    "C",
+    "Z",
+    "start OBI",
+    "end OBI",
+    "log-depth change",
+    "bid change/start spread",
+    "ask change/start spread",
+    "tanh(C)",
+    "abs(C)"
+  ],
+  "target": "observed minute-sum OFI, not return",
+  "rank_definition": "absolute-feature ranks, not forecast ranks; ties stable by universe order",
+  "aggregation": "stock/date balanced for reconstruction; timestamp then date balanced for selection",
+  "training_scale": "2017 90th percentile abs minute-sum, same divisor for both features"
+}

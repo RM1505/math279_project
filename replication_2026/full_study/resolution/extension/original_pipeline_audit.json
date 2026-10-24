@@ -1,0 +1,11 @@
+{
+  "checked_date": "2026-10-24",
+  "source_path_relative_to_original_project": "src/ofi.py",
+  "sha256": "90b7408a979767fd65f3c8072dbc4890d9b1e2b7b405e096a3149fb4f891fa2e",
+  "functions": [
+    "compute_ofi",
+    "compress_day_df_fast"
+  ],
+  "finding": "Current local helper computes successive minute contributions with per-observation normalization and sums them with exponential time weights. It does not substitute daily endpoints.",
+  "limits": "Current local code inspection, not validation of every historical version, upstream feed or backtest."
+}
